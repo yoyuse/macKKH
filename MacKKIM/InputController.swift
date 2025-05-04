@@ -172,15 +172,32 @@ class InputController: IMKInputController {
             kanji = ""; kana = ""
             commitComposition(client: client)
             return true
-        case "kana", "S-kana", "C-j":
-            if isEmpty { return kee == "kana" || kee == "S-kana" }
+        case "C-eisu", "S-eisu": // XXX
+            return true
+        case "kana", "C-kana", "S-kana", "C-j":
+            // if isEmpty { return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
             if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]); return true }
             // if candidatesMode, let event = downKeyEvent { candidates?.interpretKeyEvents([event]); return true }
+            if isEmpty {
+                if !revert(client: client) { return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
+            }
             var remainder = ""
             (kana, remainder) = romanToKana(roman)
             kana += remainder // XXX
             convert(client: client)
             return true
+            /*
+        case "C-kana", "C-S-r":
+            if isEmpty {
+                revert(client: client)
+                // convert: XXX: code copy
+                var remainder = ""
+                (kana, remainder) = romanToKana(roman)
+                kana += remainder // XXX
+                convert(client: client)
+            }
+            return true
+             */
         case "C-k":
             // YYY: hiragana/katakana
             if isEmpty { break }
@@ -331,9 +348,9 @@ private extension InputController {
     }
 
     // show buffer content
-    func showPreedit(client: IMKTextInput) {
+    func showPreedit(client: IMKTextInput, replacementRange: NSRange = NSMakeRange(NSNotFound, NSNotFound)) {
         let text = getPreedit()
-        client.setMarkedText(text, selectionRange: NSMakeRange(0, text.count), replacementRange: NSMakeRange(NSNotFound, NSNotFound))
+        client.setMarkedText(text, selectionRange: NSMakeRange(0, text.count), replacementRange: replacementRange)
     }
 }
 
@@ -361,6 +378,22 @@ extension InputController {
         guard let client = currentClient else { return }
         showPreedit(client: client)
         commitComposition(client: client)
+    }
+}
+
+// MARK: - reconvert
+extension InputController {
+    func revert(client: IMKTextInput) -> Bool {
+        // get string
+        var range = client.selectedRange()
+        // if range.length == 0 { range = NSMakeRange(0, range.location) }
+        if range.length == 0 { return false } // XXX
+        var actualRange = range
+        let string = client.string(from: range, actualRange: &actualRange)
+        guard let roman = string, !roman.isEmpty else { return false }
+        setPreedit(string: roman)
+        showPreedit(client: client, replacementRange: actualRange)
+        return true
     }
 }
 
