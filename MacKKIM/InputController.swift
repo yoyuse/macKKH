@@ -1,0 +1,580 @@
+//
+//  InputController.swift
+//  MacKKIM
+//
+//  Created by YUSE Yosihiro on 25/05/02.
+//
+
+import Cocoa
+import InputMethodKit
+
+@objc(InputController)
+class InputController: IMKInputController {
+    var dict: [String:String] = [
+        "3":"あ",  "e":"い",  "4":"う",  "5":"え",  "6":"お",
+        "t":"か",  "g":"き",  "h":"く",  "'":"け",  "b":"こ",
+        "x":"さ",  "d":"し",  "r":"す",  "p":"せ",  "c":"そ",
+        "q":"た",  "a":"ち",  "z":"つ",  "w":"て",  "s":"と",
+        "u":"な",  "i":"に",  "1":"ぬ",  ",":"ね",  "k":"の",
+        "f":"は",  "v":"ひ",  "2":"ふ",  "=":"へ",  "-":"ほ",
+        "j":"ま",  "n":"み", "\\":"む",  "/":"め",  "m":"も",
+        "7":"や",              "8":"ゆ",              "9":"よ",
+        "o":"ら",  "l":"り",  ".":"る",  ";":"れ",  "`":"ろ",
+        "0":"わ",  ")":"を",  "y":"ん",
+        "#":"ぁ",  "E":"ぃ",  "$":"ぅ",  "%":"ぇ",  "^":"ぉ",
+        "Z":"っ",  "&":"ゃ",  "*":"ゅ",  "(":"ょ",
+        "_":"ー",  "{":"「",  "}":"」",  "<":"、",  ">":"。",
+        "?":"・",  "[":"゛",  "]":"゜",
+       //
+       "t[":"が", "g[":"ぎ", "h[":"ぐ", "'[":"げ", "b[":"ご",
+       "x[":"ざ", "d[":"じ", "r[":"ず", "p[":"ぜ", "c[":"ぞ",
+       "q[":"だ", "a[":"ぢ", "z[":"づ", "w[":"で", "s[":"ど",
+       "f[":"ば", "v[":"び", "2[":"ぶ", "=[":"べ", "-[":"ぼ",
+       "f]":"ぱ", "v]":"ぴ", "2]":"ぷ", "=]":"ぺ", "-]":"ぽ",
+       "0]":"ゎ", "e]":"ゐ",             "5]":"ゑ",
+       "4[":"ヴ", "t]":"ヵ", "']":"ヶ",
+       //
+       "~1":"○", "~!":"●",
+       "~2":"▽", "~@":"▼",
+       "~3":"△", "~#":"▲",
+       "~4":"□", "~$":"■",
+       "~5":"◇", "~%":"◆",
+       "~6":"☆", "~^":"★",
+       "~7":"◎", "~&":"£",
+       "~8":"¢", "~*":"×",
+       "~9":"♂", "~(":"【",
+       "~0":"♀", "~)":"】",
+       "~-":"〜", "~_":"∴",
+       "~=":"≠", "~+":"±",
+       "~\\":"＼", "~|":"‖",
+       "~`":"´", "~~":"¨",
+       //
+       "~q":"《", "~Q":"〈",
+       "~w":"》", "~W":"〉",
+       "~r":"々", "~R":"仝",
+       "~t":"〆", "~T":"§",
+                   "~Y":"￥",
+       "~p":"〒", "~P":"↑",
+       "~[":"『", "~{":"〔",
+       "~]":"』", "~}":"〕",
+       //
+       "~s":"ヽ", "~S":"ヾ",
+       "~d":"ゝ", "~D":"ゞ",
+       "~f":"〃", "~F":"→",
+       "~g":"‐", "~G":"—",
+       "~h":"←",
+       "~j":"↓",
+       "~k":"↑",
+       "~l":"→",
+       "~;":"゛", "~:":"゜",
+       "~'":"‘", "~\"":"“",
+       //
+       "~x":"’", "~X":"”",
+       "~c":"〇", "~C":"℃",
+       "~v":"※", "~V":"÷",
+       "~b":"°", "~B":"←",
+       "~n":"′", "~N":"↓",
+       "~m":"″", "~M":"〓",
+       "~,":"‥", "~<":"≦",
+       "~.":"…", "~>":"≧",
+       "~/":"・", "~?":"∞",
+    ]
+    var romanPattern: NSRegularExpression?
+    //
+    // buffers
+    var roman: String = ""
+    var kana: String = ""
+    var kanji: String = ""
+    // client
+    var currentClient: IMKTextInput?
+    // candidate selection
+    var candidates: IMKCandidates?
+    var cand: [String] = []
+
+    // MARK: - init
+    override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
+        super.init(server: server, delegate: delegate, client: inputClient)
+        //
+        // 縦一列
+        let panelType = kIMKSingleColumnScrollingCandidatePanel
+        candidates = IMKCandidates(server: server, panelType: panelType)
+        //
+        romanPattern = makeRomanPattern(rules: dict)
+    }
+
+    // MARK: - romanToKana
+    func makeRomanPattern(rules: [String:String]) -> NSRegularExpression? {
+        // let metaChars = #"[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]"#
+        let sorted = rules.sorted { $1.key.count < $0.key.count } .map { $0.key }
+        let pattern = sorted.map { NSRegularExpression.escapedPattern(for: $0) } .joined(separator: "|")
+        // return try? NSRegularExpression(pattern: pattern)
+        return try? NSRegularExpression(pattern: "(.*?)(\(pattern))(.*)$")
+    }
+
+    func romanToKana(_ romanString: String) -> String {
+        var roman = romanString
+        guard let regex = romanPattern else { return roman }
+        var ret = ""
+        while let match = regex.firstMatch(in: roman, range: NSRange(location: 0, length: roman.count)) {
+            let nsRoman = roman as NSString
+            let ascii = nsRoman.substring(with: match.range(at: 1))
+            let kana = dict[nsRoman.substring(with: match.range(at: 2))]!
+            ret += ascii + kana // XXX
+            roman = nsRoman.substring(with: match.range(at: 3))
+        }
+        return ret
+    }
+
+    // MARK: - menu
+    override func menu() -> NSMenu! {
+        let menu = NSMenu(title: "MacKKIM")
+        menu.addItem(withTitle: "Version " + versionString(), action: nil, keyEquivalent: "")
+        return menu
+    }
+
+    // version string
+    private func versionString() -> String {
+        let version: String? = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let build: String? = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return "\(version ?? "unknown") (\(build ?? "unknown"))"
+    }
+
+    // MARK: - handle input
+    // candidates mode
+    var candidatesMode: Bool {
+        get { if let candidates: IMKCandidates = candidates, candidates.isVisible() { return true } else { return false } }
+    }
+
+    // handle
+    override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        guard let client = sender as? IMKTextInput else { return false }
+        guard let string = event.characters else { return false }
+        guard let kee = KeyEventExpression(event).stringValue else { return false }
+        //
+        let flags = event.modifierFlags
+        let charset = CharacterSet(charactersIn: dict.map { $0.key } .joined()) // XXX
+        //
+        let returnKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\n", charactersIgnoringModifiers: "\n", isARepeat: event.isARepeat, keyCode: UInt16(kVK_Return))
+        // let rightKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f703}", charactersIgnoringModifiers: "\u{f703}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_RightArrow))
+        // let leftKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f702}", charactersIgnoringModifiers: "\u{f702}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_LeftArrow))
+        let downKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f701}", charactersIgnoringModifiers: "\u{f701}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_DownArrow))
+        // let upKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f700}", charactersIgnoringModifiers: "\u{f700}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_UpArrow))
+        //
+        switch kee {
+        case "eisu", "C-l":
+            if isEmpty { return kee == "eisu" }
+            candidates?.hide()
+            kanji = ""; kana = ""
+            commitComposition(client: client)
+            return true
+        case "kana", "C-j":
+            if isEmpty { return kee == "kana" }
+            // if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]); return true }
+            if candidatesMode, let event = downKeyEvent { candidates?.interpretKeyEvents([event]); return true }
+            kana = romanToKana(roman)
+            convert(client: client)
+            return true
+        case "C-k":
+            // YYY: hiragana/katakana
+            if isEmpty { break }
+            break
+        case "delete", "C-h":
+            if isEmpty { return false }
+            deleteBackward(client: client)
+            return true
+        case "return", "C-m":
+            if candidatesMode { candidates?.interpretKeyEvents([event]); return true }
+            if isEmpty { return false }
+            kanji = ""; kana = ""
+            commitComposition(client: client)
+            return false
+            /*
+        case "space", "S-space", "tab", "S-tab":
+            if candidatesMode {
+                if let event = rightKeyEvent, candidates?.panelType() != kIMKSingleColumnScrollingCandidatePanel, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                if let event = leftKeyEvent, candidates?.panelType() != kIMKSingleColumnScrollingCandidatePanel, flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                if let event = downKeyEvent, candidates?.panelType() == kIMKSingleColumnScrollingCandidatePanel, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                if let event = upKeyEvent, candidates?.panelType() == kIMKSingleColumnScrollingCandidatePanel, flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                return true
+            }
+            if isEmpty { return false }
+            commitComposition(client: client)
+            return true
+             */
+        case "space":
+            if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
+            if isEmpty { return false }
+            kanji = ""; kana = ""
+            commitComposition(client: client)
+            return false
+        case "escape":
+            if candidatesMode { candidates?.hide(); return true }
+            kanji = ""; kana = ""
+            if isEmpty { return false }
+            /*
+            if flags.contains([.control, .command, .shift]) {
+                setPreedit(string: "")
+                showPreedit(client: client)
+                candidates?.hide()
+                return true
+            }
+             */
+            break
+        case "C-t":
+            if isEmpty { return false }
+            if roman.count < 2 { commitComposition(client: client); return false }
+            transpose(client: client)
+            return true
+        default: break
+        }
+        //
+        if candidatesMode, !charset.contains(string.unicodeScalars.first!) {
+            candidates?.interpretKeyEvents([event])
+            return true
+        }
+        //
+        if flags.contains(.control) || flags.contains(.command) {
+            commitComposition(client: client)
+            return false
+        }
+        //
+        if let range = string.rangeOfCharacter(from: charset.inverted), range.contains(string.startIndex) {
+            commitComposition(client: client)
+            return false
+        }
+        //
+        if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
+        if receive(string: string, client: client) { return true }
+        //
+        showPreedit(client: client)
+        return true
+    }
+}
+
+// MARK: - buffer of input controller
+private extension InputController {
+    // buffer state
+    var isEmpty: Bool { get { return roman.isEmpty } }
+
+    // receive key input as string
+    @discardableResult
+    func receive(string: String, client: IMKTextInput) -> Bool {
+        roman += string
+        return false
+    }
+
+    // conversion
+    func convert(client: IMKTextInput) {
+        // cand = [s]
+        // if let katakana = kana.applyingTransform(.hiraganaToKatakana, reverse: false) { cand.append(katakana) }
+        // Google Transliterate Conversion
+        let transliterator = GoogleTransliterate()
+        transliterator.transliterate(text: kana + ",", callback: { (result) in
+            DispatchQueue.main.async {
+                self.cand = result
+                self.candidates?.update()
+                self.candidates?.show()
+            }
+        })
+    }
+
+    // commit when conversion done
+    func commitComposition(client: IMKTextInput, replacementRange: NSRange = NSMakeRange(NSNotFound, NSNotFound)) {
+        let s = !kanji.isEmpty ? kanji : !kana.isEmpty ? kana : roman
+        if !s.isEmpty {
+            client.insertText(s, replacementRange: replacementRange)
+            roman = ""
+            kana = ""
+            kanji = ""
+        }
+        showPreedit(client: client)
+    }
+
+    // backspace
+    func deleteBackward(client: IMKTextInput) {
+        let _ = roman.popLast()
+        candidates?.hide()
+        showPreedit(client: client)
+    }
+
+    // transpose 2 chars before cursor
+    func transpose(client: IMKTextInput) {
+        if 1 < roman.count {
+            let s2 = String(roman.popLast()!)
+            let s1 = String(roman.popLast()!)
+            roman += s2 + s1
+        }
+        showPreedit(client: client)
+    }
+
+    // get buffer content
+    func getPreedit() -> String {
+        return roman
+    }
+
+    // set buffer content
+    func setPreedit(string: String, remainder: String = "") {
+        roman = string
+    }
+
+    // show buffer content
+    func showPreedit(client: IMKTextInput) {
+        let text = getPreedit()
+        client.setMarkedText(text, selectionRange: NSMakeRange(0, text.count), replacementRange: NSMakeRange(NSNotFound, NSNotFound))
+    }
+}
+
+// MARK: - mode of input controller
+extension InputController {
+    // // show mode tips when activated
+    override func activateServer(_ sender: Any!) {
+        guard let client = sender as? IMKTextInput else { currentClient = nil; return }
+        currentClient = client
+        return
+    }
+}
+
+extension InputController {
+    // candidates of conversion
+    override func candidates(_ sender: Any!) -> [Any]! {
+        return cand
+    }
+
+    // when candidate selected
+    override func candidateSelected(_ candidateString: NSAttributedString!) {
+        let s = candidateString.string
+        kanji = s
+        candidates?.hide()
+        guard let client = currentClient else { return }
+        showPreedit(client: client)
+        commitComposition(client: client)
+    }
+}
+
+// - Implementing google translation api in swift 3 iOS - Stack Overflow
+// - https://stackoverflow.com/questions/42449468/implementing-google-translation-api-in-swift-3-ios
+
+/*
+let translator = ROGoogleTranslate()
+translator.apiKey = "YOUR_API_KEY" // Add your API Key here
+
+var params = ROGoogleTranslateParams()
+params.source = fromLanguage.text ?? "de"
+params.target = toLanguage.text ?? "en"
+params.text = text.text ?? "Hallo"
+
+translator.translate(params: params) { (result) in
+    DispatchQueue.main.async {
+        self.translation.text = "\(result)"
+    }
+}
+ */
+
+public struct ROGoogleTranslateParams {
+
+    public init() {
+
+    }
+
+    public init(source:String, target:String, text:String) {
+        self.source = source
+        self.target = target
+        self.text = text
+    }
+
+    public var source = "de"
+    public var target = "en"
+    public var text = "Hallo"
+}
+
+
+/// Offers easier access to the Google Translate API
+open class ROGoogleTranslate {
+
+    /// Store here the Google Translate API Key
+    public var apiKey = "YOUR_API_KEY"
+
+    ///
+    /// Initial constructor
+    ///
+    public init() {
+
+    }
+
+    ///
+    /// Translate a phrase from one language into another
+    ///
+    /// - parameter params:   ROGoogleTranslate Struct contains all the needed parameters to translate with the Google Translate API
+    /// - parameter callback: The translated string will be returned in the callback
+    ///
+    open func translate(params:ROGoogleTranslateParams, callback:@escaping (_ translatedText:String) -> ()) {
+
+        guard apiKey != "" else {
+            print("Warning: You should set the api key before calling the translate method.")
+            return
+        }
+
+        if let urlEncodedText = params.text.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) {
+            if let url = URL(string: "https://translation.googleapis.com/language/translate/v2?key=\(self.apiKey)&q=\(urlEncodedText)&source=\(params.source)&target=\(params.target)&format=text") {
+
+                let httprequest = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
+                    guard error == nil else {
+                        print("Something went wrong: \(String(describing: error?.localizedDescription))")
+                        return
+                    }
+
+                    if let httpResponse = response as? HTTPURLResponse {
+
+                        guard httpResponse.statusCode == 200 else {
+
+                            if let data = data {
+                                print("Response [\(httpResponse.statusCode)] - \(data)")
+                            }
+
+                            return
+                        }
+
+                        do {
+                            // Pyramid of optional json retrieving. I know with SwiftyJSON it would be easier, but I didn't want to add an external library
+                            if let data = data {
+                                if let json = try JSONSerialization.jsonObject(with: data, options:JSONSerialization.ReadingOptions.mutableContainers) as? NSDictionary {
+                                    if let jsonData = json["data"] as? [String : Any] {
+                                        if let translations = jsonData["translations"] as? [NSDictionary] {
+                                            if let translation = translations.first as? [String : Any] {
+                                                if let translatedText = translation["translatedText"] as? String {
+                                                    callback(translatedText)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch {
+                            print("Serialization failed: \(error.localizedDescription)")
+                        }
+                    }
+                })
+
+                httprequest.resume()
+            }
+        }
+    }
+
+    open func translateTest(params: ROGoogleTranslateParams, targetLanguage: String, callback:@escaping (_ translatedText:String) -> ()) {
+
+        guard apiKey != "" else {
+            return
+        }
+
+        var request = URLRequest(url: URL(string: "https://translation.googleapis.com/language/translate/v2?key=\(self.apiKey)")!)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue(Bundle.main.bundleIdentifier ?? "", forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+
+            let jsonRequest = [
+                "q": params.text,
+                "source": "en",
+                "target": targetLanguage,
+                "format": "text"
+                ] as [String : Any]
+
+            if let jsonData = try? JSONSerialization.data(withJSONObject: jsonRequest, options: .prettyPrinted) {
+                request.httpBody = jsonData
+                let task: URLSessionDataTask = URLSession.shared.dataTask(with: request) { (data, response, error) in
+                    guard error == nil else {
+                        print("Something went wrong: \(String(describing: error?.localizedDescription))")
+                        return
+                    }
+
+                    if let httpResponse = response as? HTTPURLResponse {
+
+                        guard httpResponse.statusCode == 200 else {
+                            if let data = data {
+                                print("Response [\(httpResponse.statusCode)] - \(data)")
+                            }
+                            return
+                        }
+
+                        do {
+                            if let data = data {
+                                if let json = try JSONSerialization.jsonObject(with: data, options:JSONSerialization.ReadingOptions.mutableContainers) as? NSDictionary {
+                                    if let jsonData = json["data"] as? [String : Any] {
+                                        if let translations = jsonData["translations"] as? [NSDictionary] {
+                                            if let translation = translations.first as? [String : Any] {
+                                                if let translatedText = translation["translatedText"] as? String {
+                                                    callback(translatedText)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch {
+                            print("Serialization failed: \(error.localizedDescription)")
+                        }
+                    }
+                }
+
+                task.resume()
+            }
+    }
+}
+
+// MARK: - Google Transliterate
+// http://www.google.com/transliterate?langpair=ja-Hira|ja&text=
+
+func LOG(_ string: String) {
+    NSLog("■ %@", string)
+}
+
+open class GoogleTransliterate {
+    public init() { }
+
+    open func transliterate(text: String, callback: @escaping (_ transliterations: [String]) -> ()) {
+        // LOG(text)
+        if let urlEncodedText = text.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) {
+            // LOG(urlEncodedText)
+            if let url = URL(string: "http://www.google.com/transliterate?langpair=ja-Hira%7Cja&text=\(urlEncodedText)") {
+                let httpRequest = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
+                    guard error == nil else {
+                        print("Something went wrong: \(String(describing: error?.localizedDescription))")
+                        // LOG("Something went wrong: \(String(describing: error?.localizedDescription))")
+                        return
+                    }
+                    if let httpResponse = response as? HTTPURLResponse {
+                        // LOG("Response [\(httpResponse.statusCode)]")
+                        guard httpResponse.statusCode == 200 else {
+                            if let data = data {
+                                print("Response [\(httpResponse.statusCode)] - \(data)")
+                                // LOG("Response [\(httpResponse.statusCode)] - \(data)")
+                            }
+                            return
+                        }
+                        do {
+                            if let data = data {
+                                // LOG("Response [\(httpResponse.statusCode)] - \(data)")
+                                if let json = try JSONSerialization.jsonObject(with: data, options: JSONSerialization.ReadingOptions.mutableContainers) as? NSArray {
+                                    // LOG("\(json)")
+                                    if let jsonData = json[0] as? [Any] {
+                                        if let transliterations = jsonData[1] as? [String] {
+                                            callback(transliterations)
+                                        }
+                                    }
+                                }
+                                /*
+                                else {
+                                    LOG("bad JSONSerialization")
+                                }
+                                 */
+                            }
+                        } catch {
+                            print("Serialization failed: \(error.localizedDescription)")
+                            // LOG("Serialization failed: \(error.localizedDescription)")
+                        }
+                    }
+                })
+                httpRequest.resume()
+            }
+        }
+    }
+}

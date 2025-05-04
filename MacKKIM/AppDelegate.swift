@@ -6,6 +6,13 @@
 //
 
 import Cocoa
+import InputMethodKit
+
+// MARK: - global var
+
+private var server: IMKServer?
+
+// MARK: - main
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -15,6 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Insert code here to initialize your application
+
+        guard let name = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String else { return }
+        server = IMKServer(name: name, bundleIdentifier: Bundle.main.bundleIdentifier)
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
