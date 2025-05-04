@@ -172,10 +172,10 @@ class InputController: IMKInputController {
             kanji = ""; kana = ""
             commitComposition(client: client)
             return true
-        case "kana", "C-j":
-            if isEmpty { return kee == "kana" }
-            // if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]); return true }
-            if candidatesMode, let event = downKeyEvent { candidates?.interpretKeyEvents([event]); return true }
+        case "kana", "S-kana", "C-j":
+            if isEmpty { return kee == "kana" || kee == "S-kana" }
+            if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]); return true }
+            // if candidatesMode, let event = downKeyEvent { candidates?.interpretKeyEvents([event]); return true }
             var remainder = ""
             (kana, remainder) = romanToKana(roman)
             kana += remainder // XXX
@@ -190,7 +190,8 @@ class InputController: IMKInputController {
             deleteBackward(client: client)
             return true
         case "return", "C-m":
-            if candidatesMode { candidates?.interpretKeyEvents([event]); return true }
+            // if candidatesMode { candidates?.interpretKeyEvents([event]); return true }
+            if candidatesMode { candidates?.interpretKeyEvents([event]); return false }
             if isEmpty { return false }
             kanji = ""; kana = ""
             commitComposition(client: client)
@@ -364,6 +365,10 @@ extension InputController {
 }
 
 // MARK: - Google Transliterate
+// - Google CGI API for Japanese Input
+// - Google 日本語入力 - CGI API デベロッパーガイド
+// - https://www.google.co.jp/ime/cgiapi.html
+//
 // http://www.google.com/transliterate?langpair=ja-Hira|ja&text=
 
 // - Implementing google translation api in swift 3 iOS - Stack Overflow
