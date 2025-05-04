@@ -80,6 +80,7 @@ class InputController: IMKInputController {
        "~/":"・", "~?":"∞",
     ]
     var romanPattern: NSRegularExpression?
+    var startingCharset: CharacterSet
     //
     // buffers
     var roman: String = ""
@@ -93,6 +94,8 @@ class InputController: IMKInputController {
 
     // MARK: - init
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
+        startingCharset = CharacterSet(charactersIn: dict.map { String($0.key.first!) } .joined())
+        //
         super.init(server: server, delegate: delegate, client: inputClient)
         //
         // 縦一列
@@ -111,18 +114,20 @@ class InputController: IMKInputController {
         return try? NSRegularExpression(pattern: "(.*?)(\(pattern))(.*)$")
     }
 
-    func romanToKana(_ romanString: String) -> String {
+    func romanToKana(_ romanString: String) -> (String, String) {
         var roman = romanString
-        guard let regex = romanPattern else { return roman }
+        guard let regex = romanPattern else { return ("", roman) }
         var ret = ""
         while let match = regex.firstMatch(in: roman, range: NSRange(location: 0, length: roman.count)) {
             let nsRoman = roman as NSString
-            let ascii = nsRoman.substring(with: match.range(at: 1))
+            let noKana = nsRoman.substring(with: match.range(at: 1))
             let kana = dict[nsRoman.substring(with: match.range(at: 2))]!
-            ret += ascii + kana // XXX
+            ret += noKana + kana // XXX
             roman = nsRoman.substring(with: match.range(at: 3))
         }
-        return ret
+        // return ret
+        // return ret + roman
+        return (ret, roman)
     }
 
     // MARK: - menu
@@ -171,7 +176,9 @@ class InputController: IMKInputController {
             if isEmpty { return kee == "kana" }
             // if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]); return true }
             if candidatesMode, let event = downKeyEvent { candidates?.interpretKeyEvents([event]); return true }
-            kana = romanToKana(roman)
+            var remainder = ""
+            (kana, remainder) = romanToKana(roman)
+            kana += remainder // XXX
             convert(client: client)
             return true
         case "C-k":
@@ -244,7 +251,10 @@ class InputController: IMKInputController {
         }
         //
         if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
-        if receive(string: string, client: client) { return true }
+        if receive(string: string, client: client) {
+            commitComposition(client: client)
+            return false
+        }
         //
         showPreedit(client: client)
         return true
@@ -257,8 +267,10 @@ private extension InputController {
     var isEmpty: Bool { get { return roman.isEmpty } }
 
     // receive key input as string
-    @discardableResult
+    // @discardableResult
     func receive(string: String, client: IMKTextInput) -> Bool {
+        let remainder = romanToKana(roman + string).1
+        if !remainder.isEmpty && !startingCharset.contains(remainder.unicodeScalars.first!) { return true }
         roman += string
         return false
     }
@@ -351,177 +363,11 @@ extension InputController {
     }
 }
 
-// - Implementing google translation api in swift 3 iOS - Stack Overflow
-// - https://stackoverflow.com/questions/42449468/implementing-google-translation-api-in-swift-3-ios
-
-/*
-let translator = ROGoogleTranslate()
-translator.apiKey = "YOUR_API_KEY" // Add your API Key here
-
-var params = ROGoogleTranslateParams()
-params.source = fromLanguage.text ?? "de"
-params.target = toLanguage.text ?? "en"
-params.text = text.text ?? "Hallo"
-
-translator.translate(params: params) { (result) in
-    DispatchQueue.main.async {
-        self.translation.text = "\(result)"
-    }
-}
- */
-
-public struct ROGoogleTranslateParams {
-
-    public init() {
-
-    }
-
-    public init(source:String, target:String, text:String) {
-        self.source = source
-        self.target = target
-        self.text = text
-    }
-
-    public var source = "de"
-    public var target = "en"
-    public var text = "Hallo"
-}
-
-
-/// Offers easier access to the Google Translate API
-open class ROGoogleTranslate {
-
-    /// Store here the Google Translate API Key
-    public var apiKey = "YOUR_API_KEY"
-
-    ///
-    /// Initial constructor
-    ///
-    public init() {
-
-    }
-
-    ///
-    /// Translate a phrase from one language into another
-    ///
-    /// - parameter params:   ROGoogleTranslate Struct contains all the needed parameters to translate with the Google Translate API
-    /// - parameter callback: The translated string will be returned in the callback
-    ///
-    open func translate(params:ROGoogleTranslateParams, callback:@escaping (_ translatedText:String) -> ()) {
-
-        guard apiKey != "" else {
-            print("Warning: You should set the api key before calling the translate method.")
-            return
-        }
-
-        if let urlEncodedText = params.text.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) {
-            if let url = URL(string: "https://translation.googleapis.com/language/translate/v2?key=\(self.apiKey)&q=\(urlEncodedText)&source=\(params.source)&target=\(params.target)&format=text") {
-
-                let httprequest = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
-                    guard error == nil else {
-                        print("Something went wrong: \(String(describing: error?.localizedDescription))")
-                        return
-                    }
-
-                    if let httpResponse = response as? HTTPURLResponse {
-
-                        guard httpResponse.statusCode == 200 else {
-
-                            if let data = data {
-                                print("Response [\(httpResponse.statusCode)] - \(data)")
-                            }
-
-                            return
-                        }
-
-                        do {
-                            // Pyramid of optional json retrieving. I know with SwiftyJSON it would be easier, but I didn't want to add an external library
-                            if let data = data {
-                                if let json = try JSONSerialization.jsonObject(with: data, options:JSONSerialization.ReadingOptions.mutableContainers) as? NSDictionary {
-                                    if let jsonData = json["data"] as? [String : Any] {
-                                        if let translations = jsonData["translations"] as? [NSDictionary] {
-                                            if let translation = translations.first as? [String : Any] {
-                                                if let translatedText = translation["translatedText"] as? String {
-                                                    callback(translatedText)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } catch {
-                            print("Serialization failed: \(error.localizedDescription)")
-                        }
-                    }
-                })
-
-                httprequest.resume()
-            }
-        }
-    }
-
-    open func translateTest(params: ROGoogleTranslateParams, targetLanguage: String, callback:@escaping (_ translatedText:String) -> ()) {
-
-        guard apiKey != "" else {
-            return
-        }
-
-        var request = URLRequest(url: URL(string: "https://translation.googleapis.com/language/translate/v2?key=\(self.apiKey)")!)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue(Bundle.main.bundleIdentifier ?? "", forHTTPHeaderField: "X-Ios-Bundle-Identifier")
-
-            let jsonRequest = [
-                "q": params.text,
-                "source": "en",
-                "target": targetLanguage,
-                "format": "text"
-                ] as [String : Any]
-
-            if let jsonData = try? JSONSerialization.data(withJSONObject: jsonRequest, options: .prettyPrinted) {
-                request.httpBody = jsonData
-                let task: URLSessionDataTask = URLSession.shared.dataTask(with: request) { (data, response, error) in
-                    guard error == nil else {
-                        print("Something went wrong: \(String(describing: error?.localizedDescription))")
-                        return
-                    }
-
-                    if let httpResponse = response as? HTTPURLResponse {
-
-                        guard httpResponse.statusCode == 200 else {
-                            if let data = data {
-                                print("Response [\(httpResponse.statusCode)] - \(data)")
-                            }
-                            return
-                        }
-
-                        do {
-                            if let data = data {
-                                if let json = try JSONSerialization.jsonObject(with: data, options:JSONSerialization.ReadingOptions.mutableContainers) as? NSDictionary {
-                                    if let jsonData = json["data"] as? [String : Any] {
-                                        if let translations = jsonData["translations"] as? [NSDictionary] {
-                                            if let translation = translations.first as? [String : Any] {
-                                                if let translatedText = translation["translatedText"] as? String {
-                                                    callback(translatedText)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } catch {
-                            print("Serialization failed: \(error.localizedDescription)")
-                        }
-                    }
-                }
-
-                task.resume()
-            }
-    }
-}
-
 // MARK: - Google Transliterate
 // http://www.google.com/transliterate?langpair=ja-Hira|ja&text=
+
+// - Implementing google translation api in swift 3 iOS - Stack Overflow
+// - https://stackoverflow.com/questions/42449468/implementing-google-translation-api-in-swift-3-ios
 
 func LOG(_ string: String) {
     NSLog("■ %@", string)
@@ -531,45 +377,32 @@ open class GoogleTransliterate {
     public init() { }
 
     open func transliterate(text: String, callback: @escaping (_ transliterations: [String]) -> ()) {
-        // LOG(text)
         if let urlEncodedText = text.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) {
-            // LOG(urlEncodedText)
             if let url = URL(string: "http://www.google.com/transliterate?langpair=ja-Hira%7Cja&text=\(urlEncodedText)") {
                 let httpRequest = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
                     guard error == nil else {
                         print("Something went wrong: \(String(describing: error?.localizedDescription))")
-                        // LOG("Something went wrong: \(String(describing: error?.localizedDescription))")
                         return
                     }
                     if let httpResponse = response as? HTTPURLResponse {
-                        // LOG("Response [\(httpResponse.statusCode)]")
                         guard httpResponse.statusCode == 200 else {
                             if let data = data {
                                 print("Response [\(httpResponse.statusCode)] - \(data)")
-                                // LOG("Response [\(httpResponse.statusCode)] - \(data)")
                             }
                             return
                         }
                         do {
                             if let data = data {
-                                // LOG("Response [\(httpResponse.statusCode)] - \(data)")
                                 if let json = try JSONSerialization.jsonObject(with: data, options: JSONSerialization.ReadingOptions.mutableContainers) as? NSArray {
-                                    // LOG("\(json)")
                                     if let jsonData = json[0] as? [Any] {
                                         if let transliterations = jsonData[1] as? [String] {
                                             callback(transliterations)
                                         }
                                     }
                                 }
-                                /*
-                                else {
-                                    LOG("bad JSONSerialization")
-                                }
-                                 */
                             }
                         } catch {
                             print("Serialization failed: \(error.localizedDescription)")
-                            // LOG("Serialization failed: \(error.localizedDescription)")
                         }
                     }
                 })
