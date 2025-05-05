@@ -165,6 +165,24 @@ class InputController: IMKInputController {
         let downKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f701}", charactersIgnoringModifiers: "\u{f701}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_DownArrow))
         // let upKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f700}", charactersIgnoringModifiers: "\u{f700}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_UpArrow))
         //
+        // C-num で num 番目の候補を選択して確定
+        // XXX: bad hack
+        if candidatesMode {
+            for i in 0...9 {
+                if kee == "C-\(i)" {
+                    if i <= cand.count, let down = downKeyEvent, let ret = returnKeyEvent {
+                        var events: [NSEvent] = Array.init(repeating: down, count: i == 0 ? 9 : i - 1)
+                        events.append(ret)
+                        candidates?.hide()
+                        candidates?.show()
+                        // raiseCandidatesWindow()
+                        candidates?.interpretKeyEvents(events)
+                    }
+                    return true
+                }
+            }
+        }
+        //
         switch kee {
         case "eisu", "C-l":
             if isEmpty { return kee == "eisu" }
@@ -304,8 +322,20 @@ private extension InputController {
                 self.cand = result
                 self.candidates?.update()
                 self.candidates?.show()
+                //
+                self.raiseCandidatesWindow()
             }
         })
+    }
+
+    // 候補選択ウインドウが Spotlight の後ろに隠れないようにする
+    // - [InputMethodKit] azooKey on macOSの開発知見
+    // - https://zenn.dev/azookey/articles/d06b4ee8039ba9
+    // > ただし、Info.plistでLSBackgroundOnly=YESが指定されている場合、
+    // > 変換候補ウィンドウが文字通りBackgroundに描画されてしまうため、注意が必要です。
+    // > さらにLSUIElement=YESを設定することで正しく変換候補ウィンドウが最前面に表示されました。
+    func raiseCandidatesWindow() {
+        candidates?.perform(Selector(("setWindowLevel:")), with: Int(max(CGShieldingWindowLevel(), kCGPopUpMenuWindowLevel)))
     }
 
     // commit when conversion done
