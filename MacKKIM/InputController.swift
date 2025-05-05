@@ -91,6 +91,24 @@ class InputController: IMKInputController {
     // candidate selection
     var candidates: IMKCandidates?
     var cand: [String] = []
+    // options
+    var optCompatibleBind: Bool = false
+    // direct mode
+    var bundleIdentifier: String?
+    var directMode: Bool {
+        get {
+            guard let client = bundleIdentifier else { return false }
+            let directClients = UserDefaults.standard.array(forKey: "directClients") as? [String] ?? []
+            return directClients.contains(client)
+        }
+        set {
+            guard let client = bundleIdentifier else { return }
+            var directClients = UserDefaults.standard.array(forKey: "directClients") as? [String] ?? []
+            if newValue { directClients.insertUnique(client) }
+            else { directClients.removeAll(where: { $0 == client }) }
+            UserDefaults.standard.set(directClients, forKey: "directClients")
+        }
+    }
 
     // MARK: - init
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
@@ -103,6 +121,15 @@ class InputController: IMKInputController {
         candidates = IMKCandidates(server: server, panelType: panelType)
         //
         romanPattern = makeRomanPattern(rules: dict)
+        //
+        // options
+        UserDefaults.standard.register(defaults: ["optCompatibleBind": false])
+        optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
+        //
+        // direct mode
+        if let textInput = inputClient as? IMKTextInput {
+            bundleIdentifier = textInput.bundleIdentifier()
+        }
     }
 
     // MARK: - romanToKana
@@ -133,7 +160,24 @@ class InputController: IMKInputController {
     // MARK: - menu
     override func menu() -> NSMenu! {
         let menu = NSMenu(title: "MacKKIM")
+        var menuItem: NSMenuItem
+        // version
         menu.addItem(withTitle: "Version " + versionString(), action: nil, keyEquivalent: "")
+        // compatible bind
+        menuItem = NSMenuItem(title: "Compatible Bind", action: #selector(toggleCompatibleBind(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = optCompatibleBind ? .on : .off
+        // direct mode
+        var localizedName = bundleIdentifier ?? "?"
+        if let identifier = bundleIdentifier {
+            for app in NSRunningApplication.runningApplications(withBundleIdentifier: identifier) {
+                if let name = app.localizedName { localizedName = name; break }
+            }
+        }
+        menuItem = NSMenuItem(title: "Direct Input in “\(localizedName)”", action: #selector(toggleDirectMode(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = directMode ? .on : .off
+        //
         return menu
     }
 
@@ -144,6 +188,17 @@ class InputController: IMKInputController {
         return "\(version ?? "unknown") (\(build ?? "unknown"))"
     }
 
+    // compatible bind
+    @objc func toggleCompatibleBind(_ sender: Any) {
+        optCompatibleBind.toggle()
+        UserDefaults.standard.set(optCompatibleBind, forKey: "optCompatibleBind")
+    }
+
+    // direct mode
+    @objc func toggleDirectMode(_ sender: Any) {
+        directMode.toggle()
+    }
+
     // MARK: - handle input
     // candidates mode
     var candidatesMode: Bool {
@@ -152,6 +207,15 @@ class InputController: IMKInputController {
 
     // handle
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        // direct mode
+        if directMode {
+            switch Int(event.keyCode) {
+            case kVK_JIS_Eisu, kVK_JIS_Kana: return true
+            default: break
+            }
+            return false
+        }
+        //
         guard let client = sender as? IMKTextInput else { return false }
         guard let string = event.characters else { return false }
         guard let kee = KeyEventExpression(event).stringValue else { return false }
@@ -163,7 +227,7 @@ class InputController: IMKInputController {
         // let rightKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f703}", charactersIgnoringModifiers: "\u{f703}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_RightArrow))
         // let leftKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f702}", charactersIgnoringModifiers: "\u{f702}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_LeftArrow))
         let downKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f701}", charactersIgnoringModifiers: "\u{f701}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_DownArrow))
-        // let upKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f700}", charactersIgnoringModifiers: "\u{f700}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_UpArrow))
+        let upKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f700}", charactersIgnoringModifiers: "\u{f700}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_UpArrow))
         //
         // C-num で num 番目の候補を選択して確定
         // XXX: bad hack
@@ -226,42 +290,58 @@ class InputController: IMKInputController {
             return true
         case "return", "C-m":
             // if candidatesMode { candidates?.interpretKeyEvents([event]); return true }
-            if candidatesMode { candidates?.interpretKeyEvents([event]); return false }
+            // if candidatesMode { candidates?.interpretKeyEvents([event]); return false }
+            if candidatesMode { candidates?.interpretKeyEvents([event]); return optCompatibleBind }
             if isEmpty { return false }
             kanji = ""; kana = ""
             commitComposition(client: client)
-            return false
-            /*
-        case "space", "S-space", "tab", "S-tab":
-            if candidatesMode {
-                if let event = rightKeyEvent, candidates?.panelType() != kIMKSingleColumnScrollingCandidatePanel, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
-                if let event = leftKeyEvent, candidates?.panelType() != kIMKSingleColumnScrollingCandidatePanel, flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
-                if let event = downKeyEvent, candidates?.panelType() == kIMKSingleColumnScrollingCandidatePanel, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
-                if let event = upKeyEvent, candidates?.panelType() == kIMKSingleColumnScrollingCandidatePanel, flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+            // return false
+            return optCompatibleBind
+        case "tab", "S-tab":
+            if optCompatibleBind {
+                if candidatesMode {
+                    if let event = downKeyEvent, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                    if let event = upKeyEvent, flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                    return true
+                }
+                if isEmpty { return false }
+                commitComposition(client: client)
                 return true
             }
+            break
+        case "space", "S-space":
+            // if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
+            if candidatesMode {
+                if optCompatibleBind {
+                    if let event = downKeyEvent, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                    if let event = upKeyEvent, flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                    return true
+                } else {
+                    if let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
+                }
+            }
             if isEmpty { return false }
-            commitComposition(client: client)
-            return true
-             */
-        case "space":
-            if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
-            if isEmpty { return false }
+            if optCompatibleBind {
+                var remainder = ""
+                (kana, remainder) = romanToKana(roman)
+                kana += remainder // XXX
+                convert(client: client)
+                return true
+            }
             kanji = ""; kana = ""
             commitComposition(client: client)
-            return false
+            // return false
+            return optCompatibleBind
         case "escape":
             if candidatesMode { candidates?.hide(); return true }
             kanji = ""; kana = ""
             if isEmpty { return false }
-            /*
-            if flags.contains([.control, .command, .shift]) {
+            if optCompatibleBind {
                 setPreedit(string: "")
                 showPreedit(client: client)
                 candidates?.hide()
                 return true
             }
-             */
             break
         case "C-t":
             if isEmpty { return false }
@@ -477,5 +557,19 @@ open class GoogleTransliterate {
                 httpRequest.resume()
             }
         }
+    }
+}
+
+// MARK: - unique
+// - 【Swift】Arrayからユニークな順序付きリストへの変換を超絶シンプルに書く - Qiita
+// - https://qiita.com/ruwatana/items/7dbbb3a4a28f63aec901
+extension Array where Element: Hashable {
+    func unique() -> [Element] {
+        return NSOrderedSet(array: self).array as! [Element]
+    }
+
+    mutating func insertUnique(_ newElement: Element) {
+        insert(newElement, at: 0)
+        self = unique()
     }
 }
