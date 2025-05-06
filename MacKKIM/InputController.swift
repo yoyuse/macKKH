@@ -119,6 +119,13 @@ class InputController: IMKInputController {
         // 縦一列
         let panelType = kIMKSingleColumnScrollingCandidatePanel
         candidates = IMKCandidates(server: server, panelType: panelType)
+        // 候補選択ウインドウが Spotlight の後ろに隠れないようにする
+        // - [InputMethodKit] azooKey on macOSの開発知見
+        // - https://zenn.dev/azookey/articles/d06b4ee8039ba9
+        // > ただし、Info.plistでLSBackgroundOnly=YESが指定されている場合、
+        // > 変換候補ウィンドウが文字通りBackgroundに描画されてしまうため、注意が必要です。
+        // > さらにLSUIElement=YESを設定することで正しく変換候補ウィンドウが最前面に表示されました。
+        candidates?.perform(Selector(("setWindowLevel:")), with: Int(max(CGShieldingWindowLevel(), kCGPopUpMenuWindowLevel)))
         //
         romanPattern = makeRomanPattern(rules: dict)
         //
@@ -239,7 +246,6 @@ class InputController: IMKInputController {
                         events.append(ret)
                         candidates?.hide()
                         candidates?.show()
-                        // raiseCandidatesWindow()
                         candidates?.interpretKeyEvents(events)
                     }
                     return true
@@ -402,20 +408,8 @@ private extension InputController {
                 self.cand = result
                 self.candidates?.update()
                 self.candidates?.show()
-                //
-                self.raiseCandidatesWindow()
             }
         })
-    }
-
-    // 候補選択ウインドウが Spotlight の後ろに隠れないようにする
-    // - [InputMethodKit] azooKey on macOSの開発知見
-    // - https://zenn.dev/azookey/articles/d06b4ee8039ba9
-    // > ただし、Info.plistでLSBackgroundOnly=YESが指定されている場合、
-    // > 変換候補ウィンドウが文字通りBackgroundに描画されてしまうため、注意が必要です。
-    // > さらにLSUIElement=YESを設定することで正しく変換候補ウィンドウが最前面に表示されました。
-    func raiseCandidatesWindow() {
-        candidates?.perform(Selector(("setWindowLevel:")), with: Int(max(CGShieldingWindowLevel(), kCGPopUpMenuWindowLevel)))
     }
 
     // commit when conversion done
