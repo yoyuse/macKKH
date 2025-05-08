@@ -184,6 +184,9 @@ class InputController: IMKInputController {
         menuItem = NSMenuItem(title: "Direct Input in “\(localizedName)”", action: #selector(toggleDirectMode(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = directMode ? .on : .off
+        // kill
+        menuItem = NSMenuItem(title: "kill -HUP", action: #selector(killHUP(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
         //
         return menu
     }
@@ -204,6 +207,13 @@ class InputController: IMKInputController {
     // direct mode
     @objc func toggleDirectMode(_ sender: Any) {
         directMode.toggle()
+    }
+
+    // kill
+    @objc func killHUP(_ sender: Any) {
+        let pid = getpid()
+        // LOG("pid = \(pid)")
+        kill(pid, SIGHUP)
     }
 
     // MARK: - handle input
