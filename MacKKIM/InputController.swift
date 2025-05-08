@@ -83,7 +83,8 @@ class InputController: IMKInputController {
     var startingCharset: CharacterSet
     //
     // buffers
-    var roman: String = ""
+    // var roman: String = ""
+    var roman: String = "" { didSet { autoPreview() } }
     var kana: String = ""
     var kanji: String = ""
     // client
@@ -93,6 +94,7 @@ class InputController: IMKInputController {
     var cand: [String] = []
     // options
     var optCompatibleBind: Bool = false
+    var optKanaPreview: Bool = false { didSet { autoPreview() } }
     // direct mode
     var bundleIdentifier: String?
     var directMode: Bool {
@@ -131,7 +133,9 @@ class InputController: IMKInputController {
         //
         // options
         UserDefaults.standard.register(defaults: ["optCompatibleBind": false])
+        UserDefaults.standard.register(defaults: ["optKanaPreview": false])
         optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
+        optKanaPreview = UserDefaults.standard.bool(forKey: "optKanaPreview")
         //
         // direct mode
         if let textInput = inputClient as? IMKTextInput {
@@ -174,6 +178,10 @@ class InputController: IMKInputController {
         menuItem = NSMenuItem(title: "Compatible Bind", action: #selector(toggleCompatibleBind(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = optCompatibleBind ? .on : .off
+        // kana preview
+        menuItem = NSMenuItem(title: "Kana Preview", action: #selector(toggleKanaPreview(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = optKanaPreview ? .on : .off
         // direct mode
         var localizedName = bundleIdentifier ?? "?"
         if let identifier = bundleIdentifier {
@@ -202,6 +210,12 @@ class InputController: IMKInputController {
     @objc func toggleCompatibleBind(_ sender: Any) {
         optCompatibleBind.toggle()
         UserDefaults.standard.set(optCompatibleBind, forKey: "optCompatibleBind")
+    }
+
+    // kana preview
+    @objc func toggleKanaPreview(_ sender: Any) {
+        optKanaPreview.toggle()
+        UserDefaults.standard.set(optKanaPreview, forKey: "optKanaPreview")
     }
 
     // direct mode
@@ -239,6 +253,7 @@ class InputController: IMKInputController {
         //
         let flags = event.modifierFlags
         let charset = CharacterSet(charactersIn: dict.map { $0.key } .joined()) // XXX
+        let printable = CharacterSet.alphanumerics.union(CharacterSet.punctuationCharacters) // XXX
         //
         let returnKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\n", charactersIgnoringModifiers: "\n", isARepeat: event.isARepeat, keyCode: UInt16(kVK_Return))
         // let rightKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f703}", charactersIgnoringModifiers: "\u{f703}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_RightArrow))
@@ -257,6 +272,8 @@ class InputController: IMKInputController {
                         candidates?.hide()
                         candidates?.show()
                         candidates?.interpretKeyEvents(events)
+                        // kana preview
+                        autoPreview()
                     }
                     return true
                 }
@@ -271,6 +288,8 @@ class InputController: IMKInputController {
             commitComposition(client: client)
             return true
         case "C-eisu", "S-eisu": // XXX
+            // kana preview
+            toggleKanaPreview(self)
             return true
         case "kana", "C-kana", "S-kana", "C-j":
             // if isEmpty { return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
@@ -349,7 +368,13 @@ class InputController: IMKInputController {
             // return false
             return optCompatibleBind
         case "escape":
-            if candidatesMode { candidates?.hide(); return true }
+            // if candidatesMode { candidates?.hide(); return true }
+            if candidatesMode {
+                candidates?.hide();
+                // kana preview
+                autoPreview()
+                return true
+            }
             kanji = ""; kana = ""
             if isEmpty { return false }
             if optCompatibleBind {
@@ -365,6 +390,10 @@ class InputController: IMKInputController {
             transpose(client: client)
             return true
         default: break
+        }
+        //
+        if candidatesMode, printable.contains(string.unicodeScalars.first!), let event = returnKeyEvent {
+            candidates?.interpretKeyEvents([event])
         }
         //
         if candidatesMode, !charset.contains(string.unicodeScalars.first!) {
@@ -418,6 +447,8 @@ private extension InputController {
                 self.cand = result
                 self.candidates?.update()
                 self.candidates?.show()
+                // kana preview
+                self.autoPreview()
             }
         })
     }
@@ -436,14 +467,15 @@ private extension InputController {
 
     // backspace
     func deleteBackward(client: IMKTextInput) {
-        let _ = roman.popLast()
         candidates?.hide()
+        let _ = roman.popLast()
         showPreedit(client: client)
     }
 
     // transpose 2 chars before cursor
     func transpose(client: IMKTextInput) {
         if 1 < roman.count {
+            candidates?.hide()
             let s2 = String(roman.popLast()!)
             let s1 = String(roman.popLast()!)
             roman += s2 + s1
@@ -475,6 +507,26 @@ extension InputController {
         guard let client = sender as? IMKTextInput else { currentClient = nil; return }
         currentClient = client
         return
+    }
+
+    // kana preview
+    func showPreview(_ client: IMKTextInput, string: String) {
+        var cursorRect: NSRect = .init()
+        let _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &cursorRect)
+        HelperController.shared.showHelper(cursorRect: cursorRect, string: string)
+    }
+
+    func hidePreview() {
+        HelperController.shared.hideHelper()
+    }
+
+    func autoPreview() {
+        let (kana, remainder) = romanToKana(roman)
+        if let client = currentClient, optKanaPreview {
+            let preview: String = kana + remainder
+            if preview.isEmpty || candidatesMode { hidePreview() }
+            else { showPreview(client, string: preview) }
+        } else { hidePreview() }
     }
 }
 
