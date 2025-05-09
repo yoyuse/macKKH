@@ -127,7 +127,8 @@ class InputController: IMKInputController {
         // > ただし、Info.plistでLSBackgroundOnly=YESが指定されている場合、
         // > 変換候補ウィンドウが文字通りBackgroundに描画されてしまうため、注意が必要です。
         // > さらにLSUIElement=YESを設定することで正しく変換候補ウィンドウが最前面に表示されました。
-        candidates?.perform(Selector(("setWindowLevel:")), with: Int(max(CGShieldingWindowLevel(), kCGPopUpMenuWindowLevel)))
+        // candidates?.perform(Selector(("setWindowLevel:")), with: Int(max(CGShieldingWindowLevel(), kCGPopUpMenuWindowLevel)))
+        candidates?.perform(Selector(("setWindowLevel:")), with: kCGPopUpMenuWindowLevel)
         //
         romanPattern = makeRomanPattern(rules: dict)
         //
@@ -238,6 +239,16 @@ class InputController: IMKInputController {
 
     // handle
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        // clear to kill -HUP
+        if let kee = KeyEventExpression(event).stringValue {
+            switch kee {
+            case "C-M-kpclear":
+                // LOG("received \(kee), doing kill -HUP")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: { self.killHUP(self) })
+                return true
+            default: break
+            }
+        }
         // direct mode
         if directMode {
             switch Int(event.keyCode) {
