@@ -279,7 +279,8 @@ class InputController: IMKInputController {
                 if kee == "C-\(i)" {
                     if i <= cand.count, let down = downKeyEvent, let ret = returnKeyEvent {
                         var events: [NSEvent] = Array.init(repeating: down, count: i == 0 ? 9 : i - 1)
-                        events.append(ret)
+                        // events.append(ret)
+                        if !optCompatibleBind { events.append(ret) }
                         candidates?.hide()
                         candidates?.show()
                         candidates?.interpretKeyEvents(events)
@@ -382,6 +383,7 @@ class InputController: IMKInputController {
             // if candidatesMode { candidates?.hide(); return true }
             if candidatesMode {
                 candidates?.hide();
+                showPreedit(client: client)
                 // kana preview
                 autoPreview()
                 return true
@@ -509,6 +511,10 @@ private extension InputController {
         let text = getPreedit()
         client.setMarkedText(text, selectionRange: NSMakeRange(0, text.count), replacementRange: replacementRange)
     }
+
+    func showPreedit(client: IMKTextInput, text: String, replacementRange: NSRange = NSMakeRange(NSNotFound, NSNotFound)) {
+        client.setMarkedText(text, selectionRange: NSMakeRange(0, text.count), replacementRange: replacementRange)
+    }
 }
 
 // MARK: - mode of input controller
@@ -555,6 +561,11 @@ extension InputController {
         guard let client = currentClient else { return }
         showPreedit(client: client)
         commitComposition(client: client)
+    }
+
+    override func candidateSelectionChanged(_ candidateString: NSAttributedString!) {
+        guard let client = currentClient else { return }
+        showPreedit(client: client, text: candidateString.string)
     }
 }
 
