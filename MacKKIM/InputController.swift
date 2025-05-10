@@ -304,9 +304,9 @@ class InputController: IMKInputController {
             toggleKanaPreview(self)
             return true
         case "kana", "C-kana", "S-kana", "C-j":
-            // if isEmpty { return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
             if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]); return true }
-            // if candidatesMode, let event = downKeyEvent { candidates?.interpretKeyEvents([event]); return true }
+            // hiragana/katakana
+            if !kanji.isEmpty { commitComposition(client: client); return true }
             if isEmpty {
                 if !revert(client: client) { return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
             }
@@ -315,34 +315,30 @@ class InputController: IMKInputController {
             kana += remainder // XXX
             convert(client: client)
             return true
-            /*
-        case "C-kana", "C-S-r":
-            if isEmpty {
-                revert(client: client)
-                // convert: XXX: code copy
-                var remainder = ""
-                (kana, remainder) = romanToKana(roman)
-                kana += remainder // XXX
-                convert(client: client)
+        case "C-k":
+            if isEmpty { break }
+            // hiragana/katakana
+            if !candidatesMode && kanji.isEmpty {
+                hiragana(client: client)
+                commitComposition(client: client)
+            } else if !candidatesMode {
+                hiraganaKatakana(client: client)
+                showPreedit(client: client, text: kanji)
+            } else {
+                candidates?.hide()
+                hiraganaKatakana(client: client)
+                showPreedit(client: client, text: kanji)
             }
             return true
-             */
-        case "C-k":
-            // YYY: hiragana/katakana
-            if isEmpty { break }
-            break
         case "delete", "C-h":
             if isEmpty { return false }
             deleteBackward(client: client)
             return true
         case "return", "C-m":
-            // if candidatesMode { candidates?.interpretKeyEvents([event]); return true }
-            // if candidatesMode { candidates?.interpretKeyEvents([event]); return false }
             if candidatesMode { candidates?.interpretKeyEvents([event]); return optCompatibleBind }
             if isEmpty { return false }
-            kanji = ""; kana = ""
+            // kanji = ""; kana = ""
             commitComposition(client: client)
-            // return false
             return optCompatibleBind
         case "tab", "S-tab":
             if optCompatibleBind {
@@ -357,7 +353,6 @@ class InputController: IMKInputController {
             }
             break
         case "space", "S-space":
-            // if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
             if candidatesMode {
                 if optCompatibleBind {
                     if let event = downKeyEvent, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
@@ -375,14 +370,14 @@ class InputController: IMKInputController {
                 convert(client: client)
                 return true
             }
-            kanji = ""; kana = ""
+            // kanji = ""; kana = ""
             commitComposition(client: client)
-            // return false
             return optCompatibleBind
         case "escape":
             // if candidatesMode { candidates?.hide(); return true }
-            if candidatesMode {
+            if candidatesMode || !kanji.isEmpty {
                 candidates?.hide();
+                kanji = ""
                 showPreedit(client: client)
                 // kana preview
                 autoPreview()
@@ -425,6 +420,7 @@ class InputController: IMKInputController {
         }
         //
         if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
+        if !kanji.isEmpty { commitComposition(client: client) }
         if receive(string: string, client: client) {
             commitComposition(client: client)
             return false
@@ -447,6 +443,21 @@ private extension InputController {
         if !remainder.isEmpty && !startingCharset.contains(remainder.unicodeScalars.first!) { return true }
         roman += string
         return false
+    }
+
+    func hiragana(client: IMKTextInput) {
+        let (kana, remainder) = romanToKana(roman)
+        if let hiragana = (kana + remainder).applyingTransform(.hiraganaToKatakana, reverse: true) { kanji = hiragana }
+    }
+
+    func hiraganaKatakana(client: IMKTextInput) {
+        if NSPredicate(format: "SELF MATCHES %@", #".*[^\p{Hiragana}\p{Katakana}].*"#).evaluate(with: kanji) {
+            kanji = kana
+        } else if NSPredicate(format: "SELF MATCHES %@", #".*[\p{Katakana}].*"#).evaluate(with: kanji) {
+            kanji = kanji.applyingTransform(.hiraganaToKatakana, reverse: true) ?? kanji
+        } else if NSPredicate(format: "SELF MATCHES %@", #".*[\p{Hiragana}].*"#).evaluate(with: kanji) {
+            kanji = kanji.applyingTransform(.hiraganaToKatakana, reverse: false) ?? kanji
+        }
     }
 
     // conversion
@@ -556,7 +567,8 @@ extension InputController {
     // when candidate selected
     override func candidateSelected(_ candidateString: NSAttributedString!) {
         let s = candidateString.string
-        kanji = s
+        // kanji = s
+        kanji = kanji.isEmpty ? s : kanji
         candidates?.hide()
         guard let client = currentClient else { return }
         showPreedit(client: client)
@@ -566,6 +578,7 @@ extension InputController {
     override func candidateSelectionChanged(_ candidateString: NSAttributedString!) {
         guard let client = currentClient else { return }
         showPreedit(client: client, text: candidateString.string)
+        kanji = candidateString.string // XXX
     }
 }
 
