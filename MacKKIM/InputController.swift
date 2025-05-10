@@ -95,6 +95,7 @@ class InputController: IMKInputController {
     // options
     var optCompatibleBind: Bool = false
     var optKanaPreview: Bool = false { didSet { autoPreview() } }
+    var optSetWindowLevel: Bool = false
     // direct mode
     var bundleIdentifier: String?
     var directMode: Bool {
@@ -128,16 +129,23 @@ class InputController: IMKInputController {
         // > 変換候補ウィンドウが文字通りBackgroundに描画されてしまうため、注意が必要です。
         // > さらにLSUIElement=YESを設定することで正しく変換候補ウィンドウが最前面に表示されました。
         // candidates?.perform(Selector(("setWindowLevel:")), with: Int(max(CGShieldingWindowLevel(), kCGPopUpMenuWindowLevel)))
-        candidates?.perform(Selector(("setWindowLevel:")), with: kCGPopUpMenuWindowLevel)
+        // candidates?.perform(Selector(("setWindowLevel:")), with: kCGPopUpMenuWindowLevel)
         //
         romanPattern = makeRomanPattern(rules: dict)
         //
         // options
         UserDefaults.standard.register(defaults: ["optCompatibleBind": false])
         UserDefaults.standard.register(defaults: ["optKanaPreview": false])
+        UserDefaults.standard.register(defaults: ["optSetWindowLevel": false])
         optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
         optKanaPreview = UserDefaults.standard.bool(forKey: "optKanaPreview")
+        optSetWindowLevel = UserDefaults.standard.bool(forKey: "optSetWindowLevel")
         //
+        //
+        if optSetWindowLevel {
+            // candidates?.perform(Selector(("setWindowLevel:")), with: Int(max(CGShieldingWindowLevel(), kCGPopUpMenuWindowLevel)))
+            candidates?.perform(Selector(("setWindowLevel:")), with: kCGPopUpMenuWindowLevel)
+        }
         // direct mode
         if let textInput = inputClient as? IMKTextInput {
             bundleIdentifier = textInput.bundleIdentifier()
@@ -183,6 +191,13 @@ class InputController: IMKInputController {
         menuItem = NSMenuItem(title: "Kana Preview", action: #selector(toggleKanaPreview(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = optKanaPreview ? .on : .off
+        // setWindowLevel:
+        menuItem = NSMenuItem(title: "setWindowLevel:", action: #selector(toggleSetWindowLevel(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = optSetWindowLevel ? .on : .off
+        // kill
+        menuItem = NSMenuItem(title: "kill -HUP", action: #selector(killHUP(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
         // direct mode
         var localizedName = bundleIdentifier ?? "?"
         if let identifier = bundleIdentifier {
@@ -193,9 +208,6 @@ class InputController: IMKInputController {
         menuItem = NSMenuItem(title: "Direct Input in “\(localizedName)”", action: #selector(toggleDirectMode(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = directMode ? .on : .off
-        // kill
-        menuItem = NSMenuItem(title: "kill -HUP", action: #selector(killHUP(_:)), keyEquivalent: "")
-        menu.addItem(menuItem)
         //
         return menu
     }
@@ -219,9 +231,10 @@ class InputController: IMKInputController {
         UserDefaults.standard.set(optKanaPreview, forKey: "optKanaPreview")
     }
 
-    // direct mode
-    @objc func toggleDirectMode(_ sender: Any) {
-        directMode.toggle()
+    // setWindowLevel:
+    @objc func toggleSetWindowLevel(_ sender: Any) {
+        optSetWindowLevel.toggle()
+        UserDefaults.standard.set(optSetWindowLevel, forKey: "optSetWindowLevel")
     }
 
     // kill
@@ -229,6 +242,11 @@ class InputController: IMKInputController {
         let pid = getpid()
         // LOG("pid = \(pid)")
         kill(pid, SIGHUP)
+    }
+
+    // direct mode
+    @objc func toggleDirectMode(_ sender: Any) {
+        directMode.toggle()
     }
 
     // MARK: - handle input
