@@ -312,7 +312,8 @@ class InputController: IMKInputController {
         //
         switch kee {
         case "eisu", "C-l":
-            if isEmpty { return kee == "eisu" }
+            // if isEmpty { return kee == "eisu" }
+            if isEmpty { showMode(client); return kee == "eisu" }
             candidates?.hide()
             kanji = ""; kana = ""
             commitComposition(client: client)
@@ -326,7 +327,8 @@ class InputController: IMKInputController {
             // hiragana/katakana
             if !kanji.isEmpty { commitComposition(client: client); return true }
             if isEmpty {
-                if !revert(client: client) { return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
+                // if !revert(client: client) { return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
+                if !revert(client: client) { showMode(client); return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
             }
             var remainder = ""
             (kana, remainder) = romanToKana(roman)
@@ -548,11 +550,18 @@ private extension InputController {
 
 // MARK: - mode of input controller
 extension InputController {
-    // // show mode tips when activated
+    // show mode tips when activated
     override func activateServer(_ sender: Any!) {
         guard let client = sender as? IMKTextInput else { currentClient = nil; return }
         currentClient = client
-        return
+        showMode(client)
+    }
+
+    // show mode tips near cursor
+    func showMode(_ client: IMKTextInput) {
+        var cursorRect: NSRect = .init()
+        let _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &cursorRect)
+        HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: "mode-tips")!)
     }
 
     // kana preview
