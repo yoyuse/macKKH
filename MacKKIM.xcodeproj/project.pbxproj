@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D0338EEE2DD02E7500B8DA06 /* kanakanji.dic in Resources */ = {isa = PBXBuildFile; fileRef = D0338EED2DD02E7500B8DA06 /* kanakanji.dic */; };
+		D0338EF02DD02F7400B8DA06 /* KanaKanji.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0338EEF2DD02F7400B8DA06 /* KanaKanji.swift */; };
+		D0338EF22DD03AD300B8DA06 /* Cache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0338EF12DD03AD300B8DA06 /* Cache.swift */; };
 		D0B7F3E42DC4D04C00D7EAD6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0B7F3E32DC4D04C00D7EAD6 /* AppDelegate.swift */; };
 		D0B7F3E62DC4D04F00D7EAD6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D0B7F3E52DC4D04F00D7EAD6 /* Assets.xcassets */; };
 		D0B7F3E92DC4D04F00D7EAD6 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = D0B7F3E72DC4D04F00D7EAD6 /* MainMenu.xib */; };
@@ -16,6 +19,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D0338EED2DD02E7500B8DA06 /* kanakanji.dic */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = kanakanji.dic; sourceTree = "<group>"; };
+		D0338EEF2DD02F7400B8DA06 /* KanaKanji.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanaKanji.swift; sourceTree = "<group>"; };
+		D0338EF12DD03AD300B8DA06 /* Cache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cache.swift; sourceTree = "<group>"; };
 		D0B7F3E02DC4D04C00D7EAD6 /* MacKKIM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacKKIM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0B7F3E32DC4D04C00D7EAD6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D0B7F3E52DC4D04F00D7EAD6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -38,6 +44,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		D0338EEC2DD02DBC00B8DA06 /* KanaKanji */ = {
+			isa = PBXGroup;
+			children = (
+				D0338EED2DD02E7500B8DA06 /* kanakanji.dic */,
+				D0338EEF2DD02F7400B8DA06 /* KanaKanji.swift */,
+			);
+			path = KanaKanji;
+			sourceTree = "<group>";
+		};
 		D0B7F3D72DC4D04C00D7EAD6 = {
 			isa = PBXGroup;
 			children = (
@@ -65,6 +80,8 @@
 				D0B7F3F12DC4D81700D7EAD6 /* InputController.swift */,
 				D0B7F3F32DC4D88E00D7EAD6 /* KeyEventExpression.swift */,
 				D0EBA6D32DCC6ED60045B9F0 /* Helper.swift */,
+				D0338EF12DD03AD300B8DA06 /* Cache.swift */,
+				D0338EEC2DD02DBC00B8DA06 /* KanaKanji */,
 			);
 			path = MacKKIM;
 			sourceTree = "<group>";
@@ -128,6 +145,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D0B7F3E62DC4D04F00D7EAD6 /* Assets.xcassets in Resources */,
+				D0338EEE2DD02E7500B8DA06 /* kanakanji.dic in Resources */,
 				D0B7F3E92DC4D04F00D7EAD6 /* MainMenu.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -140,8 +158,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				D0B7F3F42DC4D88E00D7EAD6 /* KeyEventExpression.swift in Sources */,
+				D0338EF02DD02F7400B8DA06 /* KanaKanji.swift in Sources */,
 				D0B7F3F22DC4D81800D7EAD6 /* InputController.swift in Sources */,
 				D0B7F3E42DC4D04C00D7EAD6 /* AppDelegate.swift in Sources */,
+				D0338EF22DD03AD300B8DA06 /* Cache.swift in Sources */,
 				D0EBA6D42DCC6ED60045B9F0 /* Helper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -281,7 +301,7 @@
 				CODE_SIGN_ENTITLEMENTS = MacKKIM/MacKKIM.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MacKKIM/Info.plist;
 				INFOPLIST_KEY_LSBackgroundOnly = YES;
@@ -293,7 +313,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.15;
+				MARKETING_VERSION = 1.0.16;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmail.yoyuse.inputmethod.MacKKIM;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -309,7 +329,7 @@
 				CODE_SIGN_ENTITLEMENTS = MacKKIM/MacKKIM.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MacKKIM/Info.plist;
 				INFOPLIST_KEY_LSBackgroundOnly = YES;
@@ -321,7 +341,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.15;
+				MARKETING_VERSION = 1.0.16;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmail.yoyuse.inputmethod.MacKKIM;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

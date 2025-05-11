@@ -81,12 +81,16 @@ class InputController: IMKInputController {
     ]
     var romanPattern: NSRegularExpression?
     var startingCharset: CharacterSet
+    var endingCharset: CharacterSet
     //
+    // converter
+    var kanaKanji: KanaKanji
     // buffers
     // var roman: String = ""
     var roman: String = "" { didSet { autoPreview() } }
     var kana: String = ""
     var kanji: String = ""
+    // var markedText: String = ""
     // client
     var currentClient: IMKTextInput?
     // candidate selection
@@ -95,7 +99,10 @@ class InputController: IMKInputController {
     // options
     var optCompatibleBind: Bool = false
     var optKanaPreview: Bool = false { didSet { autoPreview() } }
+    var optOfflineMode: Bool = false
+    var optAutoConvert: Bool { get { return optOfflineMode } }
     var optSetWindowLevel: Bool = false
+    var candidateSelectionChanged: Bool = false
     // direct mode
     var bundleIdentifier: String?
     var directMode: Bool {
@@ -117,6 +124,9 @@ class InputController: IMKInputController {
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         startingCharset = CharacterSet(charactersIn: dict.map { String($0.key.first!) } .joined())
         //
+        endingCharset = CharacterSet(charactersIn: dict.map { String($0.key.last!) } .joined())
+        kanaKanji = KanaKanji()
+        //
         super.init(server: server, delegate: delegate, client: inputClient)
         //
         // 縦一列
@@ -136,9 +146,11 @@ class InputController: IMKInputController {
         // options
         UserDefaults.standard.register(defaults: ["optCompatibleBind": false])
         UserDefaults.standard.register(defaults: ["optKanaPreview": false])
+        UserDefaults.standard.register(defaults: ["optOfflineMode": false])
         UserDefaults.standard.register(defaults: ["optSetWindowLevel": false])
         optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
         optKanaPreview = UserDefaults.standard.bool(forKey: "optKanaPreview")
+        optOfflineMode = UserDefaults.standard.bool(forKey: "optOfflineMode")
         optSetWindowLevel = UserDefaults.standard.bool(forKey: "optSetWindowLevel")
         //
         //
@@ -149,6 +161,14 @@ class InputController: IMKInputController {
         // direct mode
         if let textInput = inputClient as? IMKTextInput {
             bundleIdentifier = textInput.bundleIdentifier()
+        }
+        //
+        if let kanaKanji = Cache.shared.object(forKey: "kanaKanji" as AnyObject) { self.kanaKanji = kanaKanji as! KanaKanji}
+        else {
+            kanaKanji = KanaKanji()
+            guard let builtinKanaKanjiDic = Bundle.main.path(forResource: "kanakanji", ofType: "dic") else { return }
+            kanaKanji.readDic(builtinKanaKanjiDic)
+            Cache.shared.setObject(kanaKanji as AnyObject, forKey: "kanaKanji" as AnyObject)
         }
     }
 
@@ -191,6 +211,10 @@ class InputController: IMKInputController {
         menuItem = NSMenuItem(title: "Kana Preview", action: #selector(toggleKanaPreview(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = optKanaPreview ? .on : .off
+        // offline mode
+        menuItem = NSMenuItem(title: "Offline Mode", action: #selector(toggleOfflineMode(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = optOfflineMode ? .on : .off
         // setWindowLevel:
         menuItem = NSMenuItem(title: "setWindowLevel:", action: #selector(toggleSetWindowLevel(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
@@ -229,6 +253,12 @@ class InputController: IMKInputController {
     @objc func toggleKanaPreview(_ sender: Any) {
         optKanaPreview.toggle()
         UserDefaults.standard.set(optKanaPreview, forKey: "optKanaPreview")
+    }
+
+    // offline mode
+    @objc func toggleOfflineMode(_ sender: Any) {
+        optOfflineMode.toggle()
+        UserDefaults.standard.set(optOfflineMode, forKey: "optOfflineMode")
     }
 
     // setWindowLevel:
@@ -282,7 +312,7 @@ class InputController: IMKInputController {
         //
         let flags = event.modifierFlags
         let charset = CharacterSet(charactersIn: dict.map { $0.key } .joined()) // XXX
-        let printable = CharacterSet.alphanumerics.union(CharacterSet.punctuationCharacters) // XXX
+        let printable = CharacterSet.alphanumerics.union(CharacterSet.punctuationCharacters).union(.symbols) // XXX
         //
         let returnKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\n", charactersIgnoringModifiers: "\n", isARepeat: event.isARepeat, keyCode: UInt16(kVK_Return))
         // let rightKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f703}", charactersIgnoringModifiers: "\u{f703}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_RightArrow))
@@ -291,7 +321,6 @@ class InputController: IMKInputController {
         let upKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f700}", charactersIgnoringModifiers: "\u{f700}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_UpArrow))
         //
         // C-num で num 番目の候補を選択して確定
-        // XXX: bad hack
         if candidatesMode {
             for i in 0...9 {
                 if kee == "C-\(i)" {
@@ -299,8 +328,11 @@ class InputController: IMKInputController {
                         var events: [NSEvent] = Array.init(repeating: down, count: i == 0 ? 9 : i - 1)
                         // events.append(ret)
                         if !optCompatibleBind { events.append(ret) }
+                        // XXX: bad hack
+                        /*
                         candidates?.hide()
                         candidates?.show()
+                         */
                         candidates?.interpretKeyEvents(events)
                         // kana preview
                         autoPreview()
@@ -355,6 +387,13 @@ class InputController: IMKInputController {
             deleteBackward(client: client)
             return true
         case "return", "C-m":
+            if optAutoConvert, candidatesMode {
+                commitComposition(client: client)
+                // commitComposition(client: client, withMarkedText: true)
+                candidates?.hide()
+                return optCompatibleBind // XXX
+            }
+            //
             if candidatesMode { candidates?.interpretKeyEvents([event]); return optCompatibleBind }
             if isEmpty { return false }
             // kanji = ""; kana = ""
@@ -365,6 +404,7 @@ class InputController: IMKInputController {
                 if candidatesMode {
                     if let event = downKeyEvent, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
                     if let event = upKeyEvent, flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                    candidateSelectionChanged = true
                     return true
                 }
                 if isEmpty { return false }
@@ -373,10 +413,18 @@ class InputController: IMKInputController {
             }
             break
         case "space", "S-space":
+            if optAutoConvert, candidatesMode {
+                commitComposition(client: client)
+                // commitComposition(client: client, withMarkedText: true)
+                candidates?.hide()
+                return optCompatibleBind // XXX
+            }
+            //
             if candidatesMode {
                 if optCompatibleBind {
                     if let event = downKeyEvent, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
                     if let event = upKeyEvent, flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
+                    candidateSelectionChanged = true
                     return true
                 } else {
                     if let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
@@ -421,11 +469,13 @@ class InputController: IMKInputController {
         }
         //
         if candidatesMode, printable.contains(string.unicodeScalars.first!), let event = returnKeyEvent {
-            candidates?.interpretKeyEvents([event])
+            // candidates?.interpretKeyEvents([event])
+            if !optAutoConvert || candidateSelectionChanged || !charset.contains(string.unicodeScalars.first!) { candidates?.interpretKeyEvents([event]) }
         }
         //
         if candidatesMode, !charset.contains(string.unicodeScalars.first!) {
             candidates?.interpretKeyEvents([event])
+            candidateSelectionChanged = true
             return true
         }
         //
@@ -439,9 +489,12 @@ class InputController: IMKInputController {
             return false
         }
         //
-        if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
-        if !kanji.isEmpty { commitComposition(client: client) }
+        // if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
+        if !optAutoConvert, candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
+        // if !kanji.isEmpty { commitComposition(client: client) }
+        if !optAutoConvert, !kanji.isEmpty { commitComposition(client: client) }
         if receive(string: string, client: client) {
+            // if optAutoConvert, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
             commitComposition(client: client)
             return false
         }
@@ -462,6 +515,14 @@ private extension InputController {
         let remainder = romanToKana(roman + string).1
         if !remainder.isEmpty && !startingCharset.contains(remainder.unicodeScalars.first!) { return true }
         roman += string
+        //
+        if optAutoConvert {
+            let (kana, remainder) = romanToKana(roman)
+            self.kana = kana + remainder
+            if !remainder.isEmpty && !endingCharset.contains(remainder.unicodeScalars.first!) { return true }
+            convert(client: client)
+        }
+        //
         return false
     }
 
@@ -482,8 +543,20 @@ private extension InputController {
 
     // conversion
     func convert(client: IMKTextInput) {
-        // cand = [s]
-        // if let katakana = kana.applyingTransform(.hiraganaToKatakana, reverse: false) { cand.append(katakana) }
+        candidateSelectionChanged = false
+        if optOfflineMode {
+            cand = kanaKanji.look(kana)
+            if let katakana = kana.applyingTransform(.hiraganaToKatakana, reverse: false) { cand.insertUnique(katakana) }
+            cand.insertUnique(kana)
+            if optAutoConvert { cand.insertUnique(roman) }
+            //
+            if kana.isEmpty || cand.count == 0 { candidates?.hide(); return } // XXX
+            candidates?.update()
+            candidates?.show()
+            autoPreview() // XXX
+            return
+        }
+        //
         // Google Transliterate Conversion
         let transliterator = GoogleTransliterate()
         transliterator.transliterate(text: kana + ",", callback: { (result) in
@@ -500,11 +573,16 @@ private extension InputController {
     // commit when conversion done
     func commitComposition(client: IMKTextInput, replacementRange: NSRange = NSMakeRange(NSNotFound, NSNotFound)) {
         let s = !kanji.isEmpty ? kanji : !kana.isEmpty ? kana : roman
+    /*
+    func commitComposition(client: IMKTextInput, replacementRange: NSRange = NSMakeRange(NSNotFound, NSNotFound), withMarkedText: Bool = false) {
+        let s = withMarkedText && !markedText.isEmpty ? markedText : !kanji.isEmpty ? kanji : !kana.isEmpty ? kana : roman
+     */
         if !s.isEmpty {
             client.insertText(s, replacementRange: replacementRange)
             roman = ""
             kana = ""
             kanji = ""
+            // markedText = ""
         }
         showPreedit(client: client)
     }
@@ -514,6 +592,12 @@ private extension InputController {
         candidates?.hide()
         let _ = roman.popLast()
         showPreedit(client: client)
+        //
+        if optAutoConvert {
+            let (kana, remainder) = romanToKana(roman)
+            self.kana = kana + remainder
+            convert(client: client)
+        }
     }
 
     // transpose 2 chars before cursor
@@ -525,6 +609,12 @@ private extension InputController {
             roman += s2 + s1
         }
         showPreedit(client: client)
+        //
+        if optAutoConvert {
+            let (kana, remainder) = romanToKana(roman)
+            self.kana = kana + remainder
+            convert(client: client)
+        }
     }
 
     // get buffer content
@@ -541,10 +631,12 @@ private extension InputController {
     func showPreedit(client: IMKTextInput, replacementRange: NSRange = NSMakeRange(NSNotFound, NSNotFound)) {
         let text = getPreedit()
         client.setMarkedText(text, selectionRange: NSMakeRange(0, text.count), replacementRange: replacementRange)
+        // markedText = text
     }
 
     func showPreedit(client: IMKTextInput, text: String, replacementRange: NSRange = NSMakeRange(NSNotFound, NSNotFound)) {
         client.setMarkedText(text, selectionRange: NSMakeRange(0, text.count), replacementRange: replacementRange)
+        // markedText = text
     }
 }
 
@@ -606,6 +698,7 @@ extension InputController {
         guard let client = currentClient else { return }
         showPreedit(client: client, text: candidateString.string)
         kanji = candidateString.string // XXX
+        // candidateSelectionChanged = true
     }
 }
 
