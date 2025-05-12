@@ -93,6 +93,10 @@ class InputController: IMKInputController {
     // var markedText: String = ""
     // client
     var currentClient: IMKTextInput?
+    // eisu mode
+    var eisuMode: Bool = false {
+        didSet { if let client = currentClient { showMode(client) } }
+    }
     // candidate selection
     var candidates: IMKCandidates?
     var cand: [String] = []
@@ -203,6 +207,10 @@ class InputController: IMKInputController {
         var menuItem: NSMenuItem
         // version
         menu.addItem(withTitle: "Version " + versionString(), action: nil, keyEquivalent: "")
+        // eisu mode
+        menuItem = NSMenuItem(title: "Eisu Mode", action: #selector(toggleEisuMode(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = eisuMode ? .on : .off
         // compatible bind
         menuItem = NSMenuItem(title: "Compatible Bind", action: #selector(toggleCompatibleBind(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
@@ -241,6 +249,11 @@ class InputController: IMKInputController {
         let version: String? = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         let build: String? = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
         return "\(version ?? "unknown") (\(build ?? "unknown"))"
+    }
+
+    // eisu mode
+    @objc func toggleEisuMode(_ sender: Any) {
+        eisuMode.toggle()
     }
 
     // compatible bind
@@ -345,7 +358,8 @@ class InputController: IMKInputController {
         switch kee {
         case "eisu", "C-l":
             // if isEmpty { return kee == "eisu" }
-            if isEmpty { if kee != "C-l" { showMode(client) }; return kee == "eisu" }
+            // if isEmpty { if kee != "C-l" { showMode(client) }; return kee == "eisu" }
+            if isEmpty { if kee != "C-l" { eisuMode = true }; return kee != "C-l" }
             candidates?.hide()
             kanji = ""; kana = ""
             commitComposition(client: client)
@@ -360,7 +374,8 @@ class InputController: IMKInputController {
             if !kanji.isEmpty { commitComposition(client: client); return true }
             if isEmpty {
                 // if !revert(client: client) { return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
-                if !revert(client: client) { if kee != "C-j" { showMode(client) }; return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
+                // if !revert(client: client) { if kee != "C-j" { showMode(client) }; return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
+                if !revert(client: client) { if kee != "C-j" { eisuMode = false }; return kee != "C-j" }
             }
             var remainder = ""
             (kana, remainder) = romanToKana(roman)
@@ -368,6 +383,7 @@ class InputController: IMKInputController {
             convert(client: client)
             return true
         case "C-k":
+            if eisuMode { return false }
             if isEmpty { break }
             // hiragana/katakana
             if !candidatesMode && kanji.isEmpty {
@@ -383,10 +399,12 @@ class InputController: IMKInputController {
             }
             return true
         case "delete", "C-h":
+            if eisuMode { return false }
             if isEmpty { return false }
             deleteBackward(client: client)
             return true
         case "return", "C-m":
+            if eisuMode { return false }
             if optAutoConvert, candidatesMode {
                 commitComposition(client: client)
                 // commitComposition(client: client, withMarkedText: true)
@@ -400,6 +418,7 @@ class InputController: IMKInputController {
             commitComposition(client: client)
             return optCompatibleBind
         case "tab", "S-tab":
+            if eisuMode { return false }
             if optCompatibleBind {
                 if candidatesMode {
                     if let event = downKeyEvent, !flags.contains(.shift) { candidates?.interpretKeyEvents([event]) }
@@ -413,6 +432,7 @@ class InputController: IMKInputController {
             }
             break
         case "space", "S-space":
+            if eisuMode { return false }
             if optAutoConvert, candidatesMode {
                 commitComposition(client: client)
                 // commitComposition(client: client, withMarkedText: true)
@@ -442,6 +462,7 @@ class InputController: IMKInputController {
             commitComposition(client: client)
             return optCompatibleBind
         case "escape":
+            if eisuMode { return false }
             // if candidatesMode { candidates?.hide(); return true }
             if candidatesMode || !kanji.isEmpty {
                 candidates?.hide();
@@ -461,12 +482,15 @@ class InputController: IMKInputController {
             }
             break
         case "C-t":
+            if eisuMode { return false }
             if isEmpty { return false }
             if roman.count < 2 { commitComposition(client: client); return false }
             transpose(client: client)
             return true
         default: break
         }
+        //
+        if eisuMode { return false }
         //
         if candidatesMode, printable.contains(string.unicodeScalars.first!), let event = returnKeyEvent {
             // candidates?.interpretKeyEvents([event])
@@ -653,7 +677,9 @@ extension InputController {
     func showMode(_ client: IMKTextInput) {
         var cursorRect: NSRect = .init()
         let _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &cursorRect)
-        HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: "mode-tips")!)
+        // HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: "mode-tips")!)
+        let image = eisuMode ? "mode-tips-eisu" : "mode-tips-kana"
+        HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: image)!)
     }
 
     // kana preview
