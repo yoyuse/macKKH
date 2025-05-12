@@ -552,16 +552,33 @@ private extension InputController {
 
     func hiragana(client: IMKTextInput) {
         let (kana, remainder) = romanToKana(roman)
+        /*
         if let hiragana = (kana + remainder).applyingTransform(.hiraganaToKatakana, reverse: true) { kanji = hiragana }
+        // ↑ これだと「もーど」が「もおど」になる
+         */
+        // kanji = (kana + remainder).katakanaToHiragana()
+        // ↑ これだと「ヴぁ」が「ゔぁ」になる
+        kanji = kana + remainder
     }
 
     func hiraganaKatakana(client: IMKTextInput) {
+        /*
         if NSPredicate(format: "SELF MATCHES %@", #".*[^\p{Hiragana}\p{Katakana}].*"#).evaluate(with: kanji) {
             kanji = kana
         } else if NSPredicate(format: "SELF MATCHES %@", #".*[\p{Katakana}].*"#).evaluate(with: kanji) {
             kanji = kanji.applyingTransform(.hiraganaToKatakana, reverse: true) ?? kanji
         } else if NSPredicate(format: "SELF MATCHES %@", #".*[\p{Hiragana}].*"#).evaluate(with: kanji) {
             kanji = kanji.applyingTransform(.hiraganaToKatakana, reverse: false) ?? kanji
+        }
+         */
+        if NSPredicate(format: "SELF MATCHES %@", #".*[\p{Katakana}].*"#).evaluate(with: kanji) {
+            // kanji = kanji.applyingTransform(.hiraganaToKatakana, reverse: true) ?? kanji
+            kanji = kanji.katakanaToHiragana()
+        } else if NSPredicate(format: "SELF MATCHES %@", #".*[\p{Hiragana}].*"#).evaluate(with: kanji) {
+            // kanji = kanji.applyingTransform(.hiraganaToKatakana, reverse: false) ?? kanji
+            kanji = kanji.hiraganaToKatakana()
+        } else if NSPredicate(format: "SELF MATCHES %@", #".*[^\p{Hiragana}\p{Katakana}].*"#).evaluate(with: kanji) {
+            kanji = kana
         }
     }
 
@@ -615,6 +632,7 @@ private extension InputController {
     func deleteBackward(client: IMKTextInput) {
         candidates?.hide()
         let _ = roman.popLast()
+        kanji = ""; kana = ""
         showPreedit(client: client)
         //
         if optAutoConvert {
@@ -795,6 +813,55 @@ open class GoogleTransliterate {
             }
         }
     }
+}
+
+// MARK: - hiragana/katakana
+extension String {
+    // XXX: bad hack
+    /*
+    func hiraganaToKatakana() -> String {
+        return self.replacingOccurrences(of: "ー", with: "\0").applyingTransform(.hiraganaToKatakana, reverse: false)?.replacingOccurrences(of: "\0", with: "ー") ?? "\(self)"
+    }
+
+    // XXX: bad hack
+    func katakanaToHiragana() -> String {
+        return self.replacingOccurrences(of: "ー", with: "\0").applyingTransform(.hiraganaToKatakana, reverse: true)?.replacingOccurrences(of: "\0", with: "ー") ?? "\(self)"
+    }
+     */
+
+    // - [Swift5] FoundationのapplyingTransformでカタカナをひらがなに変換すると長音符号(ー)が勝手に変換される
+    // - https://zenn.dev/en3_hcl/articles/e0ab050b52fc77
+    func hiraganaToKatakana() -> String {
+        let result = self.unicodeScalars.map { scalar -> UnicodeScalar in
+            if 0x3041 <= scalar.value && scalar.value <= 0x3096 { return  UnicodeScalar(scalar.value + 96)! }
+            else { return scalar }
+        }
+        return String(String.UnicodeScalarView(result))
+    }
+
+    func katakanaToHiragana() -> String {
+        let result = self.unicodeScalars.map { scalar -> UnicodeScalar in
+            if 0x30A1 <= scalar.value && scalar.value <= 0x30F6 { return  UnicodeScalar(scalar.value - 96)! }
+            else { return scalar }
+        }
+        return String(String.UnicodeScalarView(result))
+    }
+
+    // other refs:
+    // - 【Swift】ひらがな→カタカナ変換を(applyingTransformを使わずに)実装してみた
+    // - https://zenn.dev/onepointfive/articles/6153aa5905942a
+    // - 【Swift】CFStringTransformで文字の変換！ひらがな→カタカナや半角など
+    // - https://appdev-room.com/swift-cfstringtransform
+    // - [iOS|Swift3] ひらがな、カタカナ変換を文字列表で行いたい « きんくまデザイン
+    // - http://www.kuma-de.com/blog/2017-05-18/7317
+    // - Swift でひらがな／カタカナを変換する | クロジカ
+    // - https://tech.kurojica.com/archives/11899/
+
+    // yet other refs:
+    // - 漢字をひらがな/カタカナに変換する #Swift - Qiita
+    // - https://qiita.com/sgr-ksmt/items/cc8882aa80a59e5a8355
+    // - iOSで半角から全角へ変換したり、ローマ字からひらがなに変換したりする - 酢ろぐ！
+    // - https://blog.ch3cooh.jp/entry/20120619/1340100077
 }
 
 // MARK: - unique
