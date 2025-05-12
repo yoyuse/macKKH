@@ -345,7 +345,7 @@ class InputController: IMKInputController {
         switch kee {
         case "eisu", "C-l":
             // if isEmpty { return kee == "eisu" }
-            if isEmpty { showMode(client); return kee == "eisu" }
+            if isEmpty { if kee != "C-l" { showMode(client) }; return kee == "eisu" }
             candidates?.hide()
             kanji = ""; kana = ""
             commitComposition(client: client)
@@ -360,7 +360,7 @@ class InputController: IMKInputController {
             if !kanji.isEmpty { commitComposition(client: client); return true }
             if isEmpty {
                 // if !revert(client: client) { return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
-                if !revert(client: client) { showMode(client); return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
+                if !revert(client: client) { if kee != "C-j" { showMode(client) }; return kee == "kana" || kee == "C-kana" || kee == "S-kana" }
             }
             var remainder = ""
             (kana, remainder) = romanToKana(roman)
