@@ -393,6 +393,10 @@ class InputController: IMKInputController {
                 hiraganaKatakana(client: client)
                 showPreedit(client: client, text: kanji)
             } else {
+                if optAutoConvert {
+                    kanji = kana.hiraganaToKatakana()
+                    candidateSelectionChanged = true
+                }
                 candidates?.hide()
                 hiraganaKatakana(client: client)
                 showPreedit(client: client, text: kanji)
@@ -405,6 +409,7 @@ class InputController: IMKInputController {
             return true
         case "return", "C-m":
             if eisuMode { return false }
+            if optAutoConvert, !candidateSelectionChanged { kanji = ""; kana = "" }
             if optAutoConvert, candidatesMode {
                 commitComposition(client: client)
                 // commitComposition(client: client, withMarkedText: true)
@@ -433,6 +438,7 @@ class InputController: IMKInputController {
             break
         case "space", "S-space":
             if eisuMode { return false }
+            if optAutoConvert, !candidateSelectionChanged { kanji = ""; kana = "" }
             if optAutoConvert, candidatesMode {
                 commitComposition(client: client)
                 // commitComposition(client: client, withMarkedText: true)
@@ -493,6 +499,7 @@ class InputController: IMKInputController {
         if eisuMode { return false }
         //
         if candidatesMode, printable.contains(string.unicodeScalars.first!), let event = returnKeyEvent {
+            if optAutoConvert, !candidateSelectionChanged { kanji = ""; kana = "" }
             // candidates?.interpretKeyEvents([event])
             if !optAutoConvert || candidateSelectionChanged || !charset.contains(string.unicodeScalars.first!) { candidates?.interpretKeyEvents([event]) }
         }
@@ -513,6 +520,7 @@ class InputController: IMKInputController {
             return false
         }
         //
+        if optAutoConvert, candidateSelectionChanged { commitComposition(client: client) }
         // if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
         if !optAutoConvert, candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
         // if !kanji.isEmpty { commitComposition(client: client) }
@@ -587,11 +595,29 @@ private extension InputController {
         candidateSelectionChanged = false
         if optOfflineMode {
             cand = kanaKanji.look(kana)
+            /*
             if let katakana = kana.applyingTransform(.hiraganaToKatakana, reverse: false) { cand.insertUnique(katakana) }
             cand.insertUnique(kana)
             if optAutoConvert { cand.insertUnique(roman) }
             //
-            if kana.isEmpty || cand.count == 0 { candidates?.hide(); return } // XXX
+            // if kana.isEmpty || cand.count == 0 { candidates?.hide(); return } // XXX
+             */
+            /* */
+            /*
+            if kana.isEmpty || cand.count == 0 {
+                let (kana, remainder) = romanToKana(roman)
+                cand = [kana + remainder]
+            }
+             */
+            if cand.count == 0 {
+                /*
+                candidates?.hide()
+                return
+                 */
+                if !kana.isEmpty { cand = [kana] }
+                else { candidates?.hide(); return }
+            }
+            //
             candidates?.update()
             candidates?.show()
             autoPreview() // XXX
