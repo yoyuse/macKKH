@@ -112,7 +112,7 @@ class HelperPanel: NSPanel {
 
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
         label = NSTextField(labelWithString: "")
-        imageView = MyImageView(image: NSImage(named: "mode-tips")!)
+        imageView = MyImageView(image: NSImage(named: "status-icon")!)
         //
         super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
         //

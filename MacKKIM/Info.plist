@@ -32,6 +32,6 @@
 		<string>Jpan</string>
 	</array>
 	<key>tsInputMethodIconFileKey</key>
-	<string>mode-tips.svg</string>
+	<string>status-icon.svg</string>
 </dict>
 </plist>

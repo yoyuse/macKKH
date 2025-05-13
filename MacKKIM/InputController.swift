@@ -721,8 +721,8 @@ extension InputController {
     func showMode(_ client: IMKTextInput) {
         var cursorRect: NSRect = .init()
         let _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &cursorRect)
-        // HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: "mode-tips")!)
-        let image = eisuMode ? "mode-tips-eisu" : "mode-tips-kana"
+        // HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: "mode-kana")!)
+        let image = eisuMode ? "mode-eisu" : "mode-kana"
         HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: image)!)
     }
 
