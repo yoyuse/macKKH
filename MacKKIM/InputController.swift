@@ -722,7 +722,9 @@ extension InputController {
         var cursorRect: NSRect = .init()
         let _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &cursorRect)
         // HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: "mode-kana")!)
-        let image = eisuMode ? "mode-eisu" : "mode-kana"
+        // let image = eisuMode ? "mode-eisu" : "mode-kana"
+        // let image = directMode ? "mode-direct" : eisuMode ? "mode-eisu" : "mode-kana"
+        let image = directMode ? "mode-direct" : bundleIdentifier != nil ? (eisuMode ? "mode-eisu" : "mode-kana") : (eisuMode ? "mode-unknown-eisu" : "mode-unknown-kana")
         HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: image)!)
     }
 
@@ -776,8 +778,9 @@ extension InputController {
 extension InputController {
     func revert(client: IMKTextInput) -> Bool {
         // get string
-        var range = client.selectedRange()
+        // var range = client.selectedRange()
         // if range.length == 0 { range = NSMakeRange(0, range.location) }
+        let range = client.selectedRange()
         if range.length == 0 { return false } // XXX
         var actualRange = range
         let string = client.string(from: range, actualRange: &actualRange)
