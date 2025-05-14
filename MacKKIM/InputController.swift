@@ -579,13 +579,11 @@ private extension InputController {
             kanji = kanji.applyingTransform(.hiraganaToKatakana, reverse: false) ?? kanji
         }
          */
-        if NSPredicate(format: "SELF MATCHES %@", #".*[\p{Katakana}].*"#).evaluate(with: kanji) {
-            // kanji = kanji.applyingTransform(.hiraganaToKatakana, reverse: true) ?? kanji
+        if NSPredicate(format: "SELF MATCHES %@", #"[\p{Katakana}ー・]+"#).evaluate(with: kanji) {
             kanji = kanji.katakanaToHiragana()
-        } else if NSPredicate(format: "SELF MATCHES %@", #".*[\p{Hiragana}].*"#).evaluate(with: kanji) {
-            // kanji = kanji.applyingTransform(.hiraganaToKatakana, reverse: false) ?? kanji
+        } else if NSPredicate(format: "SELF MATCHES %@", #"[\p{Hiragana}ー・]+"#).evaluate(with: kanji) {
             kanji = kanji.hiraganaToKatakana()
-        } else if NSPredicate(format: "SELF MATCHES %@", #".*[^\p{Hiragana}\p{Katakana}].*"#).evaluate(with: kanji) {
+        } else if NSPredicate(format: "SELF MATCHES %@", #".*[^\p{Hiragana}\p{Katakana}ー・].*"#).evaluate(with: kanji) {
             kanji = kana
         }
     }
