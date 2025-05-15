@@ -472,7 +472,7 @@ class InputController: IMKInputController {
             // if candidatesMode { candidates?.hide(); return true }
             if candidatesMode || !kanji.isEmpty {
                 candidates?.hide();
-                kanji = ""
+                kanji = ""; kana = ""
                 showPreedit(client: client)
                 // kana preview
                 autoPreview()
@@ -755,9 +755,15 @@ extension InputController {
 
     // when candidate selected
     override func candidateSelected(_ candidateString: NSAttributedString!) {
+        /*
         let s = candidateString.string
         // kanji = s
         kanji = kanji.isEmpty ? s : kanji
+        if optAutoConvert, !candidateSelectionChanged { kanji = ""; kana = "" }
+         */
+        // if (!optAutoConvert || candidateSelectionChanged) && kanji.isEmpty  { kanji = candidateString.string }
+        if !optAutoConvert || candidateSelectionChanged  { kanji = candidateString.string }
+        /* */
         candidates?.hide()
         guard let client = currentClient else { return }
         showPreedit(client: client)
