@@ -435,7 +435,17 @@ class InputController: IMKInputController {
                 commitComposition(client: client)
                 return true
             }
-            break
+            // break
+            if optAutoConvert,!candidateSelectionChanged { kanji = ""; kana = "" }
+            if optAutoConvert, candidatesMode {
+                commitComposition(client: client)
+                candidates?.hide()
+                return false
+            }
+            if candidatesMode, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
+            if isEmpty { return false }
+            commitComposition(client: client)
+            return false
         case "space", "S-space":
             if eisuMode { return false }
             if optAutoConvert, !candidateSelectionChanged { kanji = ""; kana = "" }
