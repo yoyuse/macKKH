@@ -8,6 +8,34 @@
 import Cocoa
 import InputMethodKit
 
+// segmented conversion
+typealias Segment = (kana: String, cand: [String])
+
+// tuple を Equatable, Hashable に準拠させる
+// - [Swift] Tuple タプルの七不思議 #tuple - Qiita
+// - https://qiita.com/nak435/items/e044daa296532912a424
+struct SegmentTuple: Equatable, /* Comparable, */ Hashable {
+    typealias Element = Segment
+    let tuple: Element
+    init(_ _tuple: Element) { self.tuple = _tuple }
+    func callAsFunction() -> Element { self.tuple }
+    // Equatable
+    static func == (lhs: SegmentTuple, rhs: SegmentTuple) -> Bool {
+        lhs.tuple == rhs.tuple
+    }
+    /*
+    // Comparable
+    static func < (lhs: SegmentTuple, rhs: SegmentTuple) -> Bool {
+        lhs.tuple < rhs.tuple
+    }
+     */
+    // Hashable
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(tuple.kana)
+        hasher.combine(tuple.cand)
+    }
+}
+
 @objc(InputController)
 class InputController: IMKInputController {
     var dict: [String:String] = [
@@ -100,10 +128,14 @@ class InputController: IMKInputController {
     // candidate selection
     var candidates: IMKCandidates?
     var cand: [String] = []
+    var segments: [Segment] = []
+    // conversion history
+    var hist: [SegmentTuple] = []
     // options
     var optCompatibleBind: Bool = false
     var optKanaPreview: Bool = false { didSet { autoPreview() } }
     var optOfflineMode: Bool = false
+    var optSegmented: Bool = false
     var optAutoConvert: Bool { get { return optOfflineMode } }
     var optSetWindowLevel: Bool = false
     var candidateSelectionChanged: Bool = false
@@ -151,10 +183,12 @@ class InputController: IMKInputController {
         UserDefaults.standard.register(defaults: ["optCompatibleBind": false])
         UserDefaults.standard.register(defaults: ["optKanaPreview": false])
         UserDefaults.standard.register(defaults: ["optOfflineMode": false])
+        UserDefaults.standard.register(defaults: ["optSegmented": false])
         UserDefaults.standard.register(defaults: ["optSetWindowLevel": false])
         optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
         optKanaPreview = UserDefaults.standard.bool(forKey: "optKanaPreview")
         optOfflineMode = UserDefaults.standard.bool(forKey: "optOfflineMode")
+        optSegmented = UserDefaults.standard.bool(forKey: "optSegmented")
         optSetWindowLevel = UserDefaults.standard.bool(forKey: "optSetWindowLevel")
         //
         //
@@ -220,9 +254,13 @@ class InputController: IMKInputController {
         menu.addItem(menuItem)
         menuItem.state = optKanaPreview ? .on : .off
         // offline mode
-        menuItem = NSMenuItem(title: "Offline Mode", action: #selector(toggleOfflineMode(_:)), keyEquivalent: "")
+        menuItem = NSMenuItem(title: "Offline Auto Convert", action: #selector(toggleOfflineMode(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = optOfflineMode ? .on : .off
+        // segmented conversion
+        menuItem = NSMenuItem(title: "Single Candidate / Reconvert", action: #selector(toggleSegmented(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = optSegmented ? .on : .off
         // setWindowLevel:
         menuItem = NSMenuItem(title: "setWindowLevel:", action: #selector(toggleSetWindowLevel(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
@@ -272,6 +310,12 @@ class InputController: IMKInputController {
     @objc func toggleOfflineMode(_ sender: Any) {
         optOfflineMode.toggle()
         UserDefaults.standard.set(optOfflineMode, forKey: "optOfflineMode")
+    }
+
+    // segmented conversion
+    @objc func toggleSegmented(_ sender: Any) {
+        optSegmented.toggle()
+        UserDefaults.standard.set(optSegmented, forKey: "optSegmented")
     }
 
     // setWindowLevel:
@@ -351,6 +395,17 @@ class InputController: IMKInputController {
                         autoPreview()
                     }
                     return true
+                }
+            }
+        } else if isEmpty {
+            // C-num でカーソル位置から num 文字さかのぼって選択し再変換
+            for i in 1...9 {
+                if kee == "C-\(i)" {
+                    if revert(client: client, num: i) {
+                        kana = roman
+                        convert(client: client)
+                        return true
+                    }
                 }
             }
         }
@@ -633,6 +688,42 @@ private extension InputController {
         }
         //
         // Google Transliterate Conversion
+        if optSegmented {
+            if let found = hist.first(where: { $0.tuple.kana == kana || $0.tuple.cand.firstIndex(of: kana) != nil }) {
+                cand = found.tuple.cand
+                //
+                candidates?.update()
+                candidates?.show()
+                // kana preview
+                autoPreview()
+                // XXX: hide cand window when only one cand
+                if cand.count == 1 { candidates?.hide() }
+                //
+                return
+            }
+            //
+            let transliterator = GoogleTransliterate()
+            transliterator.transliterateSegmented(text: kana, callback: { (result) in
+                DispatchQueue.main.async {
+                    self.segments = result
+                    // for hist
+                    for segment in self.segments {
+                        self.hist.insertUnique(SegmentTuple(segment))
+                    }
+                    //
+                    let candidate = self.segments.reduce("", { $0 + $1.cand[0] })
+                    self.cand = self.segments.count == 1 ? self.segments[0].cand : [candidate]
+                    //
+                    self.candidates?.update()
+                    self.candidates?.show()
+                    // kana preview
+                    self.autoPreview()
+                    // XXX: hide cand window when only one cand
+                    if self.cand.count == 1 { self.candidates?.hide() }
+                }
+            })
+            return
+        }
         let transliterator = GoogleTransliterate()
         transliterator.transliterate(text: kana + ",", callback: { (result) in
             DispatchQueue.main.async {
@@ -790,12 +881,16 @@ extension InputController {
 
 // MARK: - reconvert
 extension InputController {
-    func revert(client: IMKTextInput) -> Bool {
+    // func revert(client: IMKTextInput) -> Bool {
+    func revert(client: IMKTextInput, num: Int? = nil) -> Bool {
         // get string
         // var range = client.selectedRange()
         // if range.length == 0 { range = NSMakeRange(0, range.location) }
-        let range = client.selectedRange()
-        if range.length == 0 { return false } // XXX
+        // let range = client.selectedRange()
+        // if range.length == 0 { return false } // XXX
+        var range = client.selectedRange()
+        if range.length == 0, let num = num { range = NSMakeRange(range.location - num, num) }
+        //
         var actualRange = range
         let string = client.string(from: range, actualRange: &actualRange)
         guard let roman = string, !roman.isEmpty else { return false }
@@ -845,6 +940,43 @@ open class GoogleTransliterate {
                                             callback(transliterations)
                                         }
                                     }
+                                }
+                            }
+                        } catch {
+                            print("Serialization failed: \(error.localizedDescription)")
+                        }
+                    }
+                })
+                httpRequest.resume()
+            }
+        }
+    }
+
+    func transliterateSegmented(text: String, callback: @escaping (_ transliterations: [Segment]) -> ()) {
+        if let urlEncodedText = text.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) {
+            if let url = URL(string: "http://www.google.com/transliterate?langpair=ja-Hira%7Cja&text=\(urlEncodedText)") {
+                let httpRequest = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
+                    guard error == nil else {
+                        print("Something went wrong: \(String(describing: error?.localizedDescription))")
+                        return
+                    }
+                    if let httpResponse = response as? HTTPURLResponse {
+                        guard httpResponse.statusCode == 200 else {
+                            if let data = data {
+                                print("Response [\(httpResponse.statusCode)] - \(data)")
+                            }
+                            return
+                        }
+                        do {
+                            if let data = data {
+                                if let json = try JSONSerialization.jsonObject(with: data, options: JSONSerialization.ReadingOptions.mutableContainers) as? NSArray {
+                                    /* */
+                                    let segmentList: [Segment] = json.map {
+                                        let elm = $0 as! [Any]
+                                        return (kana: elm[0] as! String, cand: elm[1] as! [String])
+                                    }
+                                    callback(segmentList)
+                                    /* */
                                 }
                             }
                         } catch {
