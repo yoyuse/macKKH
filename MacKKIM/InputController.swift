@@ -8,6 +8,8 @@
 import Cocoa
 import InputMethodKit
 
+func Log(_ string: String) { NSLog("■ %@", string) }
+
 // segmented conversion
 typealias Segment = (kana: String, cand: [String])
 
@@ -108,6 +110,8 @@ class InputController: IMKInputController {
        "~/":"・", "~?":"∞",
     ]
     var romanPattern: NSRegularExpression?
+    var printable: CharacterSet
+    var charset: CharacterSet
     var startingCharset: CharacterSet
     var endingCharset: CharacterSet
     //
@@ -158,6 +162,8 @@ class InputController: IMKInputController {
 
     // MARK: - init
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
+        printable = CharacterSet.alphanumerics.union(CharacterSet.punctuationCharacters).union(.symbols) // XXX
+        charset = CharacterSet(charactersIn: dict.map { $0.key } .joined()) // XXX
         startingCharset = CharacterSet(charactersIn: dict.map { String($0.key.first!) } .joined())
         //
         endingCharset = CharacterSet(charactersIn: dict.map { String($0.key.last!) } .joined())
@@ -335,7 +341,7 @@ class InputController: IMKInputController {
     // kill
     @objc func killHUP(_ sender: Any) {
         let pid = getpid()
-        // LOG("pid = \(pid)")
+        // Log("pid = \(pid)")
         kill(pid, SIGHUP)
     }
      */
@@ -358,7 +364,7 @@ class InputController: IMKInputController {
         if let kee = KeyEventExpression(event).stringValue {
             switch kee {
             case "C-M-kpclear":
-                // LOG("received \(kee), doing kill -HUP")
+                // Log("received \(kee), doing kill -HUP")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: { self.killHUP(self) })
                 return true
             default: break
@@ -379,8 +385,6 @@ class InputController: IMKInputController {
         guard let kee = KeyEventExpression(event).stringValue else { return false }
         //
         let flags = event.modifierFlags
-        let charset = CharacterSet(charactersIn: dict.map { $0.key } .joined()) // XXX
-        let printable = CharacterSet.alphanumerics.union(CharacterSet.punctuationCharacters).union(.symbols) // XXX
         //
         let returnKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\n", charactersIgnoringModifiers: "\n", isARepeat: event.isARepeat, keyCode: UInt16(kVK_Return))
         // let rightKeyEvent = NSEvent.keyEvent(with: event.type, location: event.locationInWindow, modifierFlags: [], timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil, characters: "\u{f703}", charactersIgnoringModifiers: "\u{f703}", isARepeat: event.isARepeat, keyCode: UInt16(kVK_RightArrow))
@@ -921,10 +925,6 @@ extension InputController {
 // - Implementing google translation api in swift 3 iOS - Stack Overflow
 // - https://stackoverflow.com/questions/42449468/implementing-google-translation-api-in-swift-3-ios
 
-func LOG(_ string: String) {
-    NSLog("■ %@", string)
-}
-
 open class GoogleTransliterate {
     public init() { }
 
@@ -933,13 +933,13 @@ open class GoogleTransliterate {
             if let url = URL(string: "http://www.google.com/transliterate?langpair=ja-Hira%7Cja&text=\(urlEncodedText)") {
                 let httpRequest = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
                     guard error == nil else {
-                        print("Something went wrong: \(String(describing: error?.localizedDescription))")
+                        NSLog("%@", "Something went wrong: \(String(describing: error?.localizedDescription))")
                         return
                     }
                     if let httpResponse = response as? HTTPURLResponse {
                         guard httpResponse.statusCode == 200 else {
                             if let data = data {
-                                print("Response [\(httpResponse.statusCode)] - \(data)")
+                                NSLog("%@", "Response [\(httpResponse.statusCode)] - \(data)")
                             }
                             return
                         }
@@ -954,7 +954,7 @@ open class GoogleTransliterate {
                                 }
                             }
                         } catch {
-                            print("Serialization failed: \(error.localizedDescription)")
+                            NSLog("%@", "Serialization failed: \(error.localizedDescription)")
                         }
                     }
                 })
@@ -968,13 +968,13 @@ open class GoogleTransliterate {
             if let url = URL(string: "http://www.google.com/transliterate?langpair=ja-Hira%7Cja&text=\(urlEncodedText)") {
                 let httpRequest = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
                     guard error == nil else {
-                        print("Something went wrong: \(String(describing: error?.localizedDescription))")
+                        NSLog("%@", "Something went wrong: \(String(describing: error?.localizedDescription))")
                         return
                     }
                     if let httpResponse = response as? HTTPURLResponse {
                         guard httpResponse.statusCode == 200 else {
                             if let data = data {
-                                print("Response [\(httpResponse.statusCode)] - \(data)")
+                                NSLog("%@", "Response [\(httpResponse.statusCode)] - \(data)")
                             }
                             return
                         }
@@ -991,7 +991,7 @@ open class GoogleTransliterate {
                                 }
                             }
                         } catch {
-                            print("Serialization failed: \(error.localizedDescription)")
+                            NSLog("%@", "Serialization failed: \(error.localizedDescription)")
                         }
                     }
                 })

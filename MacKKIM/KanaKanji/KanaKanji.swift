@@ -10,12 +10,12 @@ import Foundation
 open class KanaKanji {
     var dic: [String:[String]]
     var lex: [String:[String]]
-    var maxYomiCount: Int
+    // var maxYomiCount: Int
 
     public init() {
         dic = [:]
         lex = [:]
-        maxYomiCount = 0
+        // maxYomiCount = 0
     }
 
     func readDic(_ path: String) {
@@ -29,12 +29,14 @@ open class KanaKanji {
                     guard let self = self else { return }
                     self.dic[yomi] = cands
                     //
+                    /*
                     var yomiCount = yomi.count
                     if yomi.hasSuffix("—") { yomiCount -= 1 }
                     if self.maxYomiCount < yomiCount { self.maxYomiCount = yomiCount }
+                     */
                 }
             }
-        } catch let error { print(error.localizedDescription) }
+        } catch let error { NSLog("%@", error.localizedDescription) }
     }
 
     func lookSub(_ key: String) -> [String] {
