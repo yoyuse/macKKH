@@ -137,7 +137,7 @@ class InputController: IMKInputController {
     var optOfflineMode: Bool = false
     var optSegmented: Bool = false
     var optAutoConvert: Bool { get { return optOfflineMode } }
-    var optSetWindowLevel: Bool = false
+    // var optSetWindowLevel: Bool = false
     var candidateSelectionChanged: Bool = false
     // direct mode
     var bundleIdentifier: String?
@@ -184,18 +184,19 @@ class InputController: IMKInputController {
         UserDefaults.standard.register(defaults: ["optKanaPreview": false])
         UserDefaults.standard.register(defaults: ["optOfflineMode": false])
         UserDefaults.standard.register(defaults: ["optSegmented": false])
-        UserDefaults.standard.register(defaults: ["optSetWindowLevel": false])
+        // UserDefaults.standard.register(defaults: ["optSetWindowLevel": false])
         optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
         optKanaPreview = UserDefaults.standard.bool(forKey: "optKanaPreview")
         optOfflineMode = UserDefaults.standard.bool(forKey: "optOfflineMode")
         optSegmented = UserDefaults.standard.bool(forKey: "optSegmented")
-        optSetWindowLevel = UserDefaults.standard.bool(forKey: "optSetWindowLevel")
+        // optSetWindowLevel = UserDefaults.standard.bool(forKey: "optSetWindowLevel")
         //
-        //
+        /*
         if optSetWindowLevel {
             // candidates?.perform(Selector(("setWindowLevel:")), with: Int(max(CGShieldingWindowLevel(), kCGPopUpMenuWindowLevel)))
             candidates?.perform(Selector(("setWindowLevel:")), with: kCGPopUpMenuWindowLevel)
         }
+         */
         // direct mode
         if let textInput = inputClient as? IMKTextInput {
             bundleIdentifier = textInput.bundleIdentifier()
@@ -261,13 +262,17 @@ class InputController: IMKInputController {
         menuItem = NSMenuItem(title: "Single Candidate / Reconvert", action: #selector(toggleSegmented(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = optSegmented ? .on : .off
+        /*
         // setWindowLevel:
         menuItem = NSMenuItem(title: "setWindowLevel:", action: #selector(toggleSetWindowLevel(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = optSetWindowLevel ? .on : .off
+         */
+        /*
         // kill
         menuItem = NSMenuItem(title: "kill -HUP", action: #selector(killHUP(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
+         */
         // direct mode
         var localizedName = bundleIdentifier ?? "?"
         if let identifier = bundleIdentifier {
@@ -318,18 +323,22 @@ class InputController: IMKInputController {
         UserDefaults.standard.set(optSegmented, forKey: "optSegmented")
     }
 
+    /*
     // setWindowLevel:
     @objc func toggleSetWindowLevel(_ sender: Any) {
         optSetWindowLevel.toggle()
         UserDefaults.standard.set(optSetWindowLevel, forKey: "optSetWindowLevel")
     }
+     */
 
+    /*
     // kill
     @objc func killHUP(_ sender: Any) {
         let pid = getpid()
         // LOG("pid = \(pid)")
         kill(pid, SIGHUP)
     }
+     */
 
     // direct mode
     @objc func toggleDirectMode(_ sender: Any) {
@@ -344,6 +353,7 @@ class InputController: IMKInputController {
 
     // handle
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        /*
         // clear to kill -HUP
         if let kee = KeyEventExpression(event).stringValue {
             switch kee {
@@ -354,6 +364,7 @@ class InputController: IMKInputController {
             default: break
             }
         }
+         */
         // direct mode
         if directMode {
             switch Int(event.keyCode) {
