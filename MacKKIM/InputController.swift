@@ -475,6 +475,15 @@ class InputController: IMKInputController {
         case "delete", "C-h":
             if eisuMode { return false }
             if isEmpty { return false }
+            //
+            if optCompatibleBind && !optAutoConvert && (candidatesMode || !kanji.isEmpty) {
+                candidates?.hide()
+                kanji = ""; kana = ""
+                showPreedit(client: client)
+                autoPreview()
+                return true
+            }
+            //
             deleteBackward(client: client)
             return true
         case "return", "C-m":
