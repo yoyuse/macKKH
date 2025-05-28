@@ -430,9 +430,26 @@ class InputController: IMKInputController {
             // if isEmpty { return kee == "eisu" }
             // if isEmpty { if kee != "C-l" { showMode(client) }; return kee == "eisu" }
             if isEmpty { if kee != "C-l" { eisuMode = true }; return kee != "C-l" }
-            candidates?.hide()
+            // candidates?.hide()
             kanji = ""; kana = ""
-            commitComposition(client: client)
+            // 無変換確定
+            if kee == "eisu" {
+                commitComposition(client: client)
+                candidates?.hide()
+                hidePreview()
+                return true
+            }
+            /* */
+            // 無変換
+            if !optCompatibleBind { commitComposition(client: client) }
+            else if !candidatesMode { showPreedit(client: client) }
+            else {
+                if optAutoConvert { candidateSelectionChanged = true }
+                showPreedit(client: client)
+            }
+            candidates?.hide()
+            hidePreview()
+            /* */
             return true
         case "C-eisu", "S-eisu": // XXX
             // kana preview
@@ -455,6 +472,7 @@ class InputController: IMKInputController {
         case "C-k":
             if eisuMode { return false }
             if isEmpty { break }
+            /*
             // hiragana/katakana
             if !candidatesMode && kanji.isEmpty {
                 hiragana(client: client)
@@ -471,6 +489,63 @@ class InputController: IMKInputController {
                 hiraganaKatakana(client: client)
                 showPreedit(client: client, text: kanji)
             }
+            return true
+             */
+            // hiragana
+            hiragana(client: client)
+            if !optCompatibleBind { commitComposition(client: client) }
+            else if !candidatesMode { showPreedit(client: client, text: kanji) }
+            else {
+                if optAutoConvert { candidateSelectionChanged = true }
+                showPreedit(client: client, text: kanji)
+            }
+            candidates?.hide()
+            hidePreview()
+            return true
+        case "C-u":
+            if eisuMode { return false }
+            if isEmpty { break }
+            // hankaku kana
+            let (kana, remainder) = romanToKana(roman)
+            kanji = (kana + remainder).hiraganaToKatakana().zenkakuToHankaku()
+            if !optCompatibleBind { commitComposition(client: client) }
+            else if !candidatesMode { showPreedit(client: client, text: kanji) }
+            else {
+                if optAutoConvert { candidateSelectionChanged = true }
+                showPreedit(client: client, text: kanji)
+            }
+            candidates?.hide()
+            hidePreview()
+            return true
+        case "C-i":
+            if eisuMode { return false }
+            if isEmpty { break }
+            // katakana
+            katakana(client: client)
+            if !optCompatibleBind { commitComposition(client: client) }
+            else if !candidatesMode { showPreedit(client: client, text: kanji) }
+            else {
+                if optAutoConvert { candidateSelectionChanged = true }
+                showPreedit(client: client, text: kanji)
+            }
+            candidates?.hide()
+            hidePreview()
+            return true
+        case "C-o":
+            if eisuMode { return false }
+            if isEmpty { break }
+            // zenkaku eisu
+            // XXX:
+            // 大文字や記号など (未変換文字列にならないもの) が全角化の対象にならない
+            kanji = roman.hankakuToZenkaku()
+            if !optCompatibleBind { commitComposition(client: client) }
+            else if !candidatesMode { showPreedit(client: client, text: kanji) }
+            else {
+                if optAutoConvert { candidateSelectionChanged = true }
+                showPreedit(client: client, text: kanji)
+            }
+            candidates?.hide()
+            hidePreview()
             return true
         case "delete", "C-h":
             if eisuMode { return false }
@@ -546,6 +621,15 @@ class InputController: IMKInputController {
                 }
             }
             if isEmpty { return false }
+            //
+            // “読み空白”
+            if kee == "S-space", /* optCompatibleBind, */ !candidatesMode, kanji.isEmpty {
+                roman += " "
+                showPreedit(client: client)
+                autoPreview()
+                return true
+            }
+            //
             if optCompatibleBind {
                 var remainder = ""
                 (kana, remainder) = romanToKana(roman)
@@ -653,9 +737,13 @@ private extension InputController {
         if let hiragana = (kana + remainder).applyingTransform(.hiraganaToKatakana, reverse: true) { kanji = hiragana }
         // ↑ これだと「もーど」が「もおど」になる
          */
-        // kanji = (kana + remainder).katakanaToHiragana()
-        // ↑ これだと「ヴぁ」が「ゔぁ」になる
-        kanji = kana + remainder
+        kanji = (kana + remainder).katakanaToHiragana()
+        // kanji = kana + remainder
+    }
+
+    func katakana(client: IMKTextInput) {
+        let (kana, remainder) = romanToKana(roman)
+        kanji = (kana + remainder).hiraganaToKatakana()
     }
 
     func hiraganaKatakana(client: IMKTextInput) {
@@ -1026,9 +1114,18 @@ extension String {
 
     // - [Swift5] FoundationのapplyingTransformでカタカナをひらがなに変換すると長音符号(ー)が勝手に変換される
     // - https://zenn.dev/en3_hcl/articles/e0ab050b52fc77
+    // - 平仮名 (Unicodeのブロック) - Wikipedia
+    // - https://ja.wikipedia.org/wiki/%E5%B9%B3%E4%BB%AE%E5%90%8D_(Unicode%E3%81%AE%E3%83%96%E3%83%AD%E3%83%83%E3%82%AF)
+    // - 片仮名 (Unicodeのブロック) - Wikipedia
+    // - https://ja.wikipedia.org/wiki/%E7%89%87%E4%BB%AE%E5%90%8D_(Unicode%E3%81%AE%E3%83%96%E3%83%AD%E3%83%83%E3%82%AF)
+
+    // ヴヵヶ はカタカナのまま (ゔゕゖ にしない)
+    // ゝゞ ←→ ヽヾ の変換を行う
+
     func hiraganaToKatakana() -> String {
         let result = self.unicodeScalars.map { scalar -> UnicodeScalar in
-            if 0x3041 <= scalar.value && scalar.value <= 0x3096 { return  UnicodeScalar(scalar.value + 96)! }
+            // if 0x3041 <= scalar.value && scalar.value <= 0x3096 { return  UnicodeScalar(scalar.value + 96)! }
+            if 0x3041 <= scalar.value && scalar.value <= 0x3093 || scalar.value == 0x309D || scalar.value == 0x309E { return  UnicodeScalar(scalar.value + 96)! }
             else { return scalar }
         }
         return String(String.UnicodeScalarView(result))
@@ -1036,7 +1133,8 @@ extension String {
 
     func katakanaToHiragana() -> String {
         let result = self.unicodeScalars.map { scalar -> UnicodeScalar in
-            if 0x30A1 <= scalar.value && scalar.value <= 0x30F6 { return  UnicodeScalar(scalar.value - 96)! }
+            // if 0x30A1 <= scalar.value && scalar.value <= 0x30F6 { return  UnicodeScalar(scalar.value - 96)! }
+            if 0x30A1 <= scalar.value && scalar.value <= 0x30F3 || scalar.value == 0x30FD || scalar.value == 0x30FE { return  UnicodeScalar(scalar.value - 96)! }
             else { return scalar }
         }
         return String(String.UnicodeScalarView(result))
@@ -1057,6 +1155,37 @@ extension String {
     // - https://qiita.com/sgr-ksmt/items/cc8882aa80a59e5a8355
     // - iOSで半角から全角へ変換したり、ローマ字からひらがなに変換したりする - 酢ろぐ！
     // - https://blog.ch3cooh.jp/entry/20120619/1340100077
+}
+
+// MARK: - hankaku/zenkaku
+extension String {
+    // - 半角カナ - Wikipedia
+    // - https://ja.wikipedia.org/wiki/%E5%8D%8A%E8%A7%92%E3%82%AB%E3%83%8A
+
+    // ヮヰヱヵヶ ←→ ﾜﾟｲﾟｴﾟｶﾟｹﾟ の変換を行う
+    // 単独の濁点・半濁点 ゛゜ は触らない (うまく処理できない)
+    // static let HankakuSpecial = "ﾜﾟ/ｲﾟ/ｴﾟ/ｶﾟ/ｹﾟ/ﾞ/ﾟ".components(separatedBy: "/")
+    // static let ZenkakuSpecial = "ヮ/ヰ/ヱ/ヵ/ヶ/゛/゜".components(separatedBy: "/")
+    static let HankakuSpecial = "ﾜﾟ ｲﾟ ｴﾟ ｶﾟ ｹﾟ".components(separatedBy: " ")
+    static let ZenkakuSpecial = "ヮ ヰ ヱ ヵ ヶ".components(separatedBy: " ")
+
+    func hankakuToZenkaku() -> String {
+        var ret = self
+        for i in 0..<String.HankakuSpecial.count {
+            ret = ret.replacingOccurrences(of: String.HankakuSpecial[i], with: String.ZenkakuSpecial[i])
+        }
+        ret = ret.applyingTransform(.fullwidthToHalfwidth, reverse: true) ?? ret
+        return ret
+    }
+
+    func zenkakuToHankaku() -> String {
+        var ret = self
+        for i in 0..<String.ZenkakuSpecial.count {
+            ret = ret.replacingOccurrences(of: String.ZenkakuSpecial[i], with: String.HankakuSpecial[i])
+        }
+        ret = ret.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? ret
+        return ret
+    }
 }
 
 // MARK: - unique
