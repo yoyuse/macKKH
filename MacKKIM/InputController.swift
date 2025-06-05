@@ -469,7 +469,8 @@ class InputController: IMKInputController {
             kana += remainder // XXX
             convert(client: client)
             return true
-        case "C-k":
+        // case "C-k":
+        case "C-u":
             if eisuMode { return false }
             if isEmpty { break }
             /*
@@ -502,7 +503,8 @@ class InputController: IMKInputController {
             candidates?.hide()
             hidePreview()
             return true
-        case "C-u":
+        // case "C-u":
+        case "C-o":
             if eisuMode { return false }
             if isEmpty { break }
             // hankaku kana
@@ -517,7 +519,8 @@ class InputController: IMKInputController {
             candidates?.hide()
             hidePreview()
             return true
-        case "C-i":
+        // case "C-i":
+        case "C-k":
             if eisuMode { return false }
             if isEmpty { break }
             // katakana
@@ -531,12 +534,11 @@ class InputController: IMKInputController {
             candidates?.hide()
             hidePreview()
             return true
-        case "C-o":
+        // case "C-o":
+        case "C-y":
             if eisuMode { return false }
             if isEmpty { break }
             // zenkaku eisu
-            // XXX:
-            // 大文字や記号など (未変換文字列にならないもの) が全角化の対象にならない
             kanji = roman.hankakuToZenkaku()
             if !optCompatibleBind { commitComposition(client: client) }
             else if !candidatesMode { showPreedit(client: client, text: kanji) }
@@ -688,7 +690,15 @@ class InputController: IMKInputController {
             return false
         }
         //
+        /*
+        // 大文字・記号など
         if let range = string.rangeOfCharacter(from: charset.inverted), range.contains(string.startIndex) {
+            commitComposition(client: client)
+            return false
+        }
+         */
+        // 非印字文字 (矢印キーなど)
+        if !printable.contains(string.unicodeScalars.first!) {
             commitComposition(client: client)
             return false
         }
@@ -718,13 +728,15 @@ private extension InputController {
     // @discardableResult
     func receive(string: String, client: IMKTextInput) -> Bool {
         let remainder = romanToKana(roman + string).1
-        if !remainder.isEmpty && !startingCharset.contains(remainder.unicodeScalars.first!) { return true }
+        // 大文字・記号など
+        // if !remainder.isEmpty && !startingCharset.contains(remainder.unicodeScalars.first!) { return true }
         roman += string
         //
         if optAutoConvert {
             let (kana, remainder) = romanToKana(roman)
             self.kana = kana + remainder
-            if !remainder.isEmpty && !endingCharset.contains(remainder.unicodeScalars.first!) { return true }
+            // 大文字・記号など
+            // if !remainder.isEmpty && !endingCharset.contains(remainder.unicodeScalars.first!) { return true }
             convert(client: client)
         }
         //
