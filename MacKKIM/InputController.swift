@@ -553,7 +553,8 @@ class InputController: IMKInputController {
             if eisuMode { return false }
             if isEmpty { return false }
             //
-            if optCompatibleBind && !optAutoConvert && (candidatesMode || !kanji.isEmpty) {
+            // if optCompatibleBind && !optAutoConvert && (candidatesMode || !kanji.isEmpty) {
+            if /* optCompatibleBind && */ !optAutoConvert && (candidatesMode || !kanji.isEmpty) {
                 candidates?.hide()
                 kanji = ""; kana = ""
                 showPreedit(client: client)
@@ -642,7 +643,8 @@ class InputController: IMKInputController {
             // kanji = ""; kana = ""
             commitComposition(client: client)
             return optCompatibleBind
-        case "escape":
+        // case "escape":
+        case "escape", "C-g":
             if eisuMode { return false }
             // if candidatesMode { candidates?.hide(); return true }
             if candidatesMode || !kanji.isEmpty {
@@ -655,6 +657,7 @@ class InputController: IMKInputController {
             }
             kanji = ""; kana = ""
             if isEmpty { return false }
+            /*
             if optCompatibleBind {
                 setPreedit(string: "")
                 showPreedit(client: client)
@@ -662,12 +665,19 @@ class InputController: IMKInputController {
                 return true
             }
             break
+             */
+            setPreedit(string: "")
+            showPreedit(client: client)
+            candidates?.hide()
+            return true
+            /*
         case "C-t":
             if eisuMode { return false }
             if isEmpty { return false }
             if roman.count < 2 { commitComposition(client: client); return false }
             transpose(client: client)
             return true
+             */
         default: break
         }
         //
