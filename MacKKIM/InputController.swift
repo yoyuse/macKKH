@@ -107,7 +107,8 @@ class InputController: IMKInputController {
        "~m":"″", "~M":"〓",
        "~,":"‥", "~<":"≦",
        "~.":"…", "~>":"≧",
-       "~/":"・", "~?":"∞",
+       // "~/":"・", "~?":"∞",
+       "~/":"／", "~?":"∞",
     ]
     var romanPattern: NSRegularExpression?
     var printable: CharacterSet
