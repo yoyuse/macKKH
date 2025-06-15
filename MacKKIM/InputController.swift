@@ -536,7 +536,8 @@ class InputController: IMKInputController {
             hidePreview()
             return true
         // case "C-o":
-        case "C-y":
+        // case "C-y":
+        case "C-t":
             if eisuMode { return false }
             if isEmpty { break }
             // zenkaku eisu
