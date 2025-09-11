@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>InputMethodConnectionName</key>
-	<string>MacKKIM_Connection</string>
+	<string>macKKH_Connection</string>
 	<key>InputMethodServerControllerClass</key>
 	<string>InputController</string>
 	<key>NSAppTransportSecurity</key>
@@ -24,7 +24,7 @@
 		</dict>
 	</dict>
 	<key>TISInputSourceID</key>
-	<string>com.gmail.yoyuse.inputmethod.MacKKIM</string>
+	<string>com.gmail.yoyuse.inputmethod.macKKH</string>
 	<key>TISIntendedLanguage</key>
 	<string>ja</string>
 	<key>tsInputMethodCharacterRepertoireKey</key>

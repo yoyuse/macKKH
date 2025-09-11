@@ -245,7 +245,7 @@ class InputController: IMKInputController {
 
     // MARK: - menu
     override func menu() -> NSMenu! {
-        let menu = NSMenu(title: "MacKKIM")
+        let menu = NSMenu(title: "macKKH")
         var menuItem: NSMenuItem
         // version
         menu.addItem(withTitle: "Version " + versionString(), action: nil, keyEquivalent: "")
