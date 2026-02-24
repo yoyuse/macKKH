@@ -40,7 +40,8 @@ struct SegmentTuple: Equatable, /* Comparable, */ Hashable {
 
 @objc(InputController)
 class InputController: IMKInputController {
-    var dict: [String:String] = [
+    var dict: [String:String] { get { return optRGTs ? dictRGTs : dictUSKana } }
+    var dictUSKana: [String:String] = [
         "3":"あ",  "e":"い",  "4":"う",  "5":"え",  "6":"お",
         "t":"か",  "g":"き",  "h":"く",  "'":"け",  "b":"こ",
         "x":"さ",  "d":"し",  "r":"す",  "p":"せ",  "c":"そ",
@@ -110,11 +111,132 @@ class InputController: IMKInputController {
        // "~/":"・", "~?":"∞",
        "~/":"／", "~?":"∞",
     ]
-    var romanPattern: NSRegularExpression?
+    var dictRGTs: [String:String] = [
+        "a":"あ", "i":"い", "u":"う", "e":"え", "o":"お",
+        "ka":"か", "ki":"き", "ku":"く", "ke":"け", "ko":"こ",
+        "sa":"さ", "si":"し", "su":"す", "se":"せ", "so":"そ",
+        "ta":"た", "ti":"ち", "tu":"つ", "te":"て", "to":"と",
+        "na":"な", "ni":"に", "nu":"ぬ", "ne":"ね", "no":"の",
+        "ha":"は", "hi":"ひ", "hu":"ふ", "he":"へ", "ho":"ほ",
+        "ma":"ま", "mi":"み", "mu":"む", "me":"め", "mo":"も",
+        "ya":"や", "yu":"ゆ", "yo":"よ",
+        "ra":"ら", "ri":"り", "ru":"る", "re":"れ", "ro":"ろ",
+        "wa":"わ", "wi":"うぃ", "we":"うぇ", "wo":"を",
+        "n'":"ん",
+        "ga":"が", "gi":"ぎ", "gu":"ぐ", "ge":"げ", "go":"ご",
+        "za":"ざ", "zi":"じ", "zu":"ず", "ze":"ぜ", "zo":"ぞ",
+        "da":"だ", "di":"ぢ", "du":"づ", "de":"で", "do":"ど",
+        "ba":"ば", "bi":"び", "bu":"ぶ", "be":"べ", "bo":"ぼ",
+        "pa":"ぱ", "pi":"ぴ", "pu":"ぷ", "pe":"ぺ", "po":"ぽ",
+        //
+        "kya":"きゃ", "kyu":"きゅ", "kye":"きぇ", "kyo":"きょ",
+        "sya":"しゃ", "syu":"しゅ", "sye":"しぇ", "syo":"しょ",
+        "sha":"しゃ", "shu":"しゅ", "she":"しぇ", "sho":"しょ",
+        "cha":"ちゃ", "chu":"ちゅ", "che":"ちぇ", "cho":"ちょ",
+        "tya":"ちゃ", "tyu":"ちゅ", "tye":"ちぇ", "tyo":"ちょ",
+        "nya":"にゃ", "nyu":"にゅ", "nye":"にぇ", "nyo":"にょ",
+        "hya":"ひゃ", "hyu":"ひゅ", "hye":"ひぇ", "hyo":"ひょ",
+        "mya":"みゃ", "myu":"みゅ", "mye":"みぇ", "myo":"みょ",
+        "rya":"りゃ", "ryu":"りゅ", "rye":"りぇ", "ryo":"りょ",
+        "gya":"ぎゃ", "gyu":"ぎゅ", "gye":"ぎぇ", "gyo":"ぎょ",
+        "zya":"じゃ", "zyu":"じゅ", "zye":"じぇ", "zyo":"じょ",
+        "ja":"じゃ", "ju":"じゅ", "je":"じぇ", "jo":"じょ",
+        "dya":"ぢゃ", "dyu":"ぢゅ", "dye":"ぢぇ", "dyo":"ぢょ",
+        "bya":"びゃ", "byu":"びゅ", "bye":"びぇ", "byo":"びょ",
+        "pya":"ぴゃ", "pyu":"ぴゅ", "pye":"ぴぇ", "pyo":"ぴょ",
+        //
+        "kwa":"くぁ", "kwi":"くぃ", "kwe":"くぇ", "kwo":"くぉ",
+        "tsa":"つぁ", "tsi":"つぃ", "tse":"つぇ", "tso":"つぉ",
+        "fa":"ふぁ", "fi":"ふぃ", "fe":"ふぇ", "fo":"ふぉ",
+        "gwa":"ぐぁ", "gwi":"ぐぃ", "gwe":"ぐぇ", "gwo":"ぐぉ",
+        //
+        "ji":"じ", "fu":"ふ", "ye":"いぇ", "who":"うぉ",
+        "whi":"うぃ", "whe":"うぇ", // XXX
+        //
+        "va":"ヴぁ", "vi":"ヴぃ", "vu":"ヴ", "ve":"ヴぇ", "vo":"ヴぉ",
+        //
+        "xa":"ぁ", "xi":"ぃ", "xu":"ぅ", "xe":"ぇ", "xo":"ぉ",
+        "xya":"ゃ", "xyu":"ゅ", "xyo":"ょ", "xwa":"ゎ",
+        "xka":"ヵ", "xke":"ヶ",
+        //
+        "wyi":"ゐ", "wye":"ゑ",
+        "thi":"てぃ", "thu":"てゅ", "twu":"とぅ",
+        "dhi":"でぃ", "dhu":"でゅ", "dwu":"どぅ",
+        "fyu":"ふゅ", "vyu":"ヴゅ", "qwa":"くゎ",
+        //
+        "n":"ん",
+        //
+        "-":"ー", "[":"「", "]":"」", ".":"。", ",":"、",
+        "/":"・",
+        //
+        "w":"を", "r":"る", "t":"た", "s":"し", "d":"で",
+        "g":"が", "h":"は", "k":"か", "m":"ま",
+        "y":"き", "p":"こ", "f":"と", "j":"の", "l":"す", "z":"て",
+        "x":"っ", "c":"く", "v":"に", "b":"な",
+        //
+        "w;":"を", "r;":"る", "t;":"た", "s;":"し", "d;":"で",
+        "g;":"が", "h;":"は", "k;":"か", "m;":"ま",
+        "y;":"き", "p;":"こ", "f;":"と", "j;":"の", "l;":"す", "z;":"て",
+        "x;":"っ", "c;":"く", "v;":"に", "b;":"な",
+        //
+        "n;":"ん",
+        "rq":"るい", "tq":"たい", "sq":"しょ", "dq":"であ",
+        "gq":"がい", "hq":"はい", "kq":"かい", "mq":"まい",
+        "yq":"きょ",
+        "pq":"こう", "fq":"とう", "jq":"のう", "lq":"すう", "zq":"てい",
+        "xq":"っけ", "cq":"くう", "vq":"にゅ", "bq":"ない",
+        //
+        "q1":"○", "q!":"●",
+        "q2":"▽", "q@":"▼",
+        "q3":"△", "q#":"▲",
+        "q4":"□", "q$":"■",
+        "q5":"◇", "q%":"◆",
+        "q6":"☆", "q^":"★",
+        "q7":"◎", "q&":"£",
+        "q8":"¢", "q*":"×",
+        "q9":"♂", "q(":"【",
+        "q0":"♀", "q)":"】",
+        "q-":"〜", "q_":"∴",
+        "q=":"≠", "q+":"±",
+        "q\\":"＼", "q|":"‖",
+        "q`":"´", "q~":"¨",
+        //
+        "qq":"’", "qQ":"”",
+        "qr":"々", "qR":"仝",
+        "qt":"〆", "qT":"§",
+        "qp":"〒", "qP":"↑",
+        "q[":"『", "q{":"〔",
+        "q]":"』", "q}":"〕",
+        //
+        "qs":"ヽ", "qS":"ヾ",
+        "qd":"ゝ", "qD":"ゞ",
+        "qf":"〃", "qF":"→",
+        "qg":"‐", "qG":"—",
+        "qh":"←",
+        "qj":"↓",
+        "qk":"↑",
+        "ql":"→",
+        "q;":"゛", "q:":"゜",
+        "q'":"‘", "q\"":"“",
+        //
+        "qz":"《", "qZ":"〈",
+        "qx":"》", "qX":"〉",
+        "qc":"〇", "qC":"℃",
+        "qv":"※", "qV":"÷",
+        "qb":"°", "qB":"←",
+        "qn":"′", "qN":"↓",
+        "qm":"″", "qM":"〓",
+        "q,":"‥", "q<":"≦",
+        "q.":"…", "q>":"≧",
+        "q/":"・", "q?":"∞",
+    ]
+    var romanPatternUSKana: NSRegularExpression?
+    var romanPatternRGTs: NSRegularExpression?
+    var romanPattern: NSRegularExpression? { get { optRGTs ? romanPatternRGTs : romanPatternUSKana } }
     var printable: CharacterSet
-    var charset: CharacterSet
-    var startingCharset: CharacterSet
-    var endingCharset: CharacterSet
+    var charset: CharacterSet { get { return CharacterSet(charactersIn: dict.map { $0.key } .joined()) } } // XXX
+    // var startingCharset: CharacterSet
+    // var endingCharset: CharacterSet
     //
     // converter
     var kanaKanji: KanaKanji
@@ -137,6 +259,7 @@ class InputController: IMKInputController {
     // conversion history
     var hist: [SegmentTuple] = []
     // options
+    var optRGTs: Bool = false
     var optCompatibleBind: Bool = false
     var optKanaPreview: Bool = false { didSet { autoPreview() } }
     var optOfflineMode: Bool = false
@@ -168,10 +291,9 @@ class InputController: IMKInputController {
     // MARK: - init
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         printable = CharacterSet.alphanumerics.union(CharacterSet.punctuationCharacters).union(.symbols) // XXX
-        charset = CharacterSet(charactersIn: dict.map { $0.key } .joined()) // XXX
-        startingCharset = CharacterSet(charactersIn: dict.map { String($0.key.first!) } .joined())
-        //
-        endingCharset = CharacterSet(charactersIn: dict.map { String($0.key.last!) } .joined())
+        // charset = CharacterSet(charactersIn: dict.map { $0.key } .joined()) // XXX
+        // startingCharset = CharacterSet(charactersIn: dict.map { String($0.key.first!) } .joined())
+        // endingCharset = CharacterSet(charactersIn: dict.map { String($0.key.last!) } .joined())
         kanaKanji = KanaKanji()
         //
         super.init(server: server, delegate: delegate, client: inputClient)
@@ -188,14 +310,18 @@ class InputController: IMKInputController {
         // candidates?.perform(Selector(("setWindowLevel:")), with: Int(max(CGShieldingWindowLevel(), kCGPopUpMenuWindowLevel)))
         // candidates?.perform(Selector(("setWindowLevel:")), with: kCGPopUpMenuWindowLevel)
         //
-        romanPattern = makeRomanPattern(rules: dict)
+        // romanPattern = makeRomanPattern(rules: dict)
+        romanPatternUSKana = makeRomanPattern(rules: dictUSKana)
+        romanPatternRGTs = makeRomanPattern(rules: dictRGTs)
         //
         // options
+        UserDefaults.standard.register(defaults: ["optRGTs": false])
         UserDefaults.standard.register(defaults: ["optCompatibleBind": false])
         UserDefaults.standard.register(defaults: ["optKanaPreview": false])
         UserDefaults.standard.register(defaults: ["optOfflineMode": false])
         UserDefaults.standard.register(defaults: ["optSegmented": false])
         // UserDefaults.standard.register(defaults: ["optSetWindowLevel": false])
+        optRGTs = UserDefaults.standard.bool(forKey: "optRGTs")
         optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
         optKanaPreview = UserDefaults.standard.bool(forKey: "optKanaPreview")
         optOfflineMode = UserDefaults.standard.bool(forKey: "optOfflineMode")
@@ -261,6 +387,10 @@ class InputController: IMKInputController {
         menuItem.state = eisuMode ? .on : .off
         //
         menu.addItem(.separator())
+        // rgts
+        menuItem = NSMenuItem(title: "RGTs", action: #selector(toggleRGTs(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = optRGTs ? .on : .off
         // compatible bind
         menuItem = NSMenuItem(title: "Compatible Bind", action: #selector(toggleCompatibleBind(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
@@ -310,7 +440,7 @@ class InputController: IMKInputController {
         return menu
     }
 
-    // version string
+    // version string
     private func versionString() -> String {
         let version: String? = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         let build: String? = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
@@ -320,6 +450,12 @@ class InputController: IMKInputController {
     // eisu mode
     @objc func toggleEisuMode(_ sender: Any) {
         eisuMode.toggle()
+    }
+
+    // rgts
+    @objc func toggleRGTs(_ sender: Any) {
+        optRGTs.toggle()
+        UserDefaults.standard.set(optRGTs, forKey: "optRGTs")
     }
 
     // compatible bind
