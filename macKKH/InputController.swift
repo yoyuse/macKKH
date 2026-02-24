@@ -160,6 +160,9 @@ class InputController: IMKInputController {
             UserDefaults.standard.set(directClients, forKey: "directClients")
         }
     }
+    // MODETIPS
+    var timer: Timer = Timer()
+    // /MODETIPS
 
     // MARK: - init
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
@@ -947,10 +950,25 @@ private extension InputController {
 extension InputController {
     // show mode tips when activated
     override func activateServer(_ sender: Any!) {
+        super.activateServer(sender)
+        //
         guard let client = sender as? IMKTextInput else { currentClient = nil; return }
         currentClient = client
-        showMode(client)
+        // MODETIPS
+        // showMode(client)
+        timer.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: false) { _ in self.showMode(client) }
+        // /MODETIPS
     }
+
+    // MODETIPS
+    override func deactivateServer(_ sender: Any!) {
+        hideMode()
+        timer.invalidate()
+        //
+        super.deactivateServer(sender)
+    }
+    // /MODETIPS
 
     // show mode tips near cursor
     func showMode(_ client: IMKTextInput) {
@@ -962,6 +980,12 @@ extension InputController {
         let image = directMode ? "mode-direct" : bundleIdentifier != nil ? (eisuMode ? "mode-eisu" : "mode-kana") : (eisuMode ? "mode-unknown-eisu" : "mode-unknown-kana")
         HelperController.shared.showHelper(cursorRect: cursorRect, image: NSImage(named: image)!)
     }
+
+    // MODETIPS
+    func hideMode() {
+        HelperController.shared.hideHelper()
+    }
+    // /MODETIPS
 
     // kana preview
     func showPreview(_ client: IMKTextInput, string: String) {
