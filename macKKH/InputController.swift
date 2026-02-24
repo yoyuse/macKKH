@@ -163,6 +163,7 @@ class InputController: IMKInputController {
     // MODETIPS
     var timer: Timer = Timer()
     // /MODETIPS
+    var restartOnDeactivate: Bool = false
 
     // MARK: - init
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
@@ -252,10 +253,14 @@ class InputController: IMKInputController {
         var menuItem: NSMenuItem
         // version
         menu.addItem(withTitle: "Version " + versionString(), action: nil, keyEquivalent: "")
+        //
+        menu.addItem(.separator())
         // eisu mode
         menuItem = NSMenuItem(title: "Eisu Mode", action: #selector(toggleEisuMode(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = eisuMode ? .on : .off
+        //
+        menu.addItem(.separator())
         // compatible bind
         menuItem = NSMenuItem(title: "Compatible Bind", action: #selector(toggleCompatibleBind(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
@@ -278,11 +283,19 @@ class InputController: IMKInputController {
         menu.addItem(menuItem)
         menuItem.state = optSetWindowLevel ? .on : .off
          */
+        //
+        menu.addItem(.separator())
+        // restart on deactivate
+        menuItem = NSMenuItem(title: "Restart on Deactivate", action: #selector(toggleRestartOnDeactivate(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = restartOnDeactivate ? .on : .off
         /*
         // kill
         menuItem = NSMenuItem(title: "kill -HUP", action: #selector(killHUP(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
          */
+        //
+        menu.addItem(.separator())
         // direct mode
         var localizedName = bundleIdentifier ?? "?"
         if let identifier = bundleIdentifier {
@@ -349,6 +362,10 @@ class InputController: IMKInputController {
         kill(pid, SIGHUP)
     }
      */
+
+    @objc func toggleRestartOnDeactivate(_ sender: Any) {
+        restartOnDeactivate.toggle()
+    }
 
     // direct mode
     @objc func toggleDirectMode(_ sender: Any) {
@@ -965,6 +982,11 @@ extension InputController {
     override func deactivateServer(_ sender: Any!) {
         hideMode()
         timer.invalidate()
+        if restartOnDeactivate {
+            // Log("restarting...")
+            let delay = 0.1 // 3.0
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: { kill(getpid(), SIGHUP) })
+        }
         //
         super.deactivateServer(sender)
     }
