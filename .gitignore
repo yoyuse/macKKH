@@ -1,10 +1,7 @@
-# setversion.scpt が生成するファイル
-project.pbxproj.bak
-
 # Xcodeのビルド生成物
 # ビルドすると自動生成されるので無視
 build/
-DerivedData
+DerivedData/
 
 # Xcodeのプライベート設定
 # （ウィンドウサイズ、ブックマーク、ブレイクポイントなど）
