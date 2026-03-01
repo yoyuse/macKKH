@@ -287,6 +287,13 @@ class InputController: IMKInputController {
     var timer: Timer = Timer()
     // /MODETIPS
     var restartOnDeactivate: Bool = false
+    // prefix kanchoku
+    var optPrefixKanchoku: Bool = false
+    var prefix: String = "|"
+    var prefixed: Bool = false
+    var tt: TT
+    var help: String = ""
+    // /prefix kanchoku
 
     // MARK: - init
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
@@ -295,6 +302,9 @@ class InputController: IMKInputController {
         // startingCharset = CharacterSet(charactersIn: dict.map { String($0.key.first!) } .joined())
         // endingCharset = CharacterSet(charactersIn: dict.map { String($0.key.last!) } .joined())
         kanaKanji = KanaKanji()
+        // prefix kanchoku
+        tt = TT()
+        // /prefix kanchoku
         //
         super.init(server: server, delegate: delegate, client: inputClient)
         //
@@ -320,12 +330,18 @@ class InputController: IMKInputController {
         UserDefaults.standard.register(defaults: ["optKanaPreview": false])
         UserDefaults.standard.register(defaults: ["optOfflineMode": false])
         UserDefaults.standard.register(defaults: ["optSegmented": false])
+        // prefix kanchoku
+        UserDefaults.standard.register(defaults: ["optPrefixKanchoku": false])
+        // /prefix kanchoku
         // UserDefaults.standard.register(defaults: ["optSetWindowLevel": false])
         optRGTs = UserDefaults.standard.bool(forKey: "optRGTs")
         optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
         optKanaPreview = UserDefaults.standard.bool(forKey: "optKanaPreview")
         optOfflineMode = UserDefaults.standard.bool(forKey: "optOfflineMode")
         optSegmented = UserDefaults.standard.bool(forKey: "optSegmented")
+        // prefix kanchoku
+        optPrefixKanchoku = UserDefaults.standard.bool(forKey: "optPrefixKanchoku")
+        // /prefix kanchoku
         // optSetWindowLevel = UserDefaults.standard.bool(forKey: "optSetWindowLevel")
         //
         /*
@@ -339,13 +355,22 @@ class InputController: IMKInputController {
             bundleIdentifier = textInput.bundleIdentifier()
         }
         //
-        if let kanaKanji = Cache.shared.object(forKey: "kanaKanji" as AnyObject) { self.kanaKanji = kanaKanji as! KanaKanji}
+        if let kanaKanji = Cache.shared.object(forKey: "kanaKanji" as AnyObject) { self.kanaKanji = kanaKanji as! KanaKanji }
         else {
             kanaKanji = KanaKanji()
             guard let builtinKanaKanjiDic = Bundle.main.path(forResource: "kanakanji", ofType: "dic") else { return }
+            guard let builtinTankanjiRev = Bundle.main.path(forResource: "tankanji", ofType: "rev") else { return }
             kanaKanji.readDic(builtinKanaKanjiDic)
+            kanaKanji.readRev(builtinTankanjiRev)
             Cache.shared.setObject(kanaKanji as AnyObject, forKey: "kanaKanji" as AnyObject)
         }
+        // prefix kanchoku
+        if let tt = Cache.shared.object(forKey: "tt" as AnyObject) { self.tt = tt as! TT }
+        else {
+            tt = TT()
+            Cache.shared.setObject(tt as AnyObject, forKey: "tt" as AnyObject)
+        }
+        // /prefix kanchoku
     }
 
     // MARK: - romanToKana
@@ -407,6 +432,11 @@ class InputController: IMKInputController {
         menuItem = NSMenuItem(title: "Single Candidate / Reconvert", action: #selector(toggleSegmented(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = optSegmented ? .on : .off
+        // prefix kanchoku
+        menuItem = NSMenuItem(title: "TT-code input (“\(prefix)” Prefix)", action: #selector(togglePrefixKanchoku(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = optPrefixKanchoku ? .on : .off
+        // /prefix kanchoku
         /*
         // setWindowLevel:
         menuItem = NSMenuItem(title: "setWindowLevel:", action: #selector(toggleSetWindowLevel(_:)), keyEquivalent: "")
@@ -482,6 +512,14 @@ class InputController: IMKInputController {
         UserDefaults.standard.set(optSegmented, forKey: "optSegmented")
     }
 
+    // prefix kanchoku
+    @objc func togglePrefixKanchoku(_ sender: Any) {
+        optPrefixKanchoku.toggle()
+        tt.reset()
+        UserDefaults.standard.set(optPrefixKanchoku, forKey: "optPrefixKanchoku")
+    }
+    // /prefix kanchoku
+
     /*
     // setWindowLevel:
     @objc func toggleSetWindowLevel(_ sender: Any) {
@@ -516,6 +554,9 @@ class InputController: IMKInputController {
 
     // handle
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        // prefix kanchoku
+        help = "" // clear help
+        // /prefix kanchoku
         /*
         // clear to kill -HUP
         if let kee = KeyEventExpression(event).stringValue {
@@ -649,8 +690,12 @@ class InputController: IMKInputController {
             }
             return true
              */
+            // prefix kanchoku
             // hiragana
-            hiragana(client: client)
+            // hiragana(client: client)
+            if optPrefixKanchoku { kana(client: client) }
+            else { hiragana(client: client) }
+            // /prefix kanchoku
             if !optCompatibleBind { commitComposition(client: client) }
             else if !candidatesMode { showPreedit(client: client, text: kanji) }
             else {
@@ -719,6 +764,9 @@ class InputController: IMKInputController {
                 autoPreview()
                 return true
             }
+            // prefix kanchoku
+            if optPrefixKanchoku && !tt.isReset { tt.reset(); return true }
+            // /prefix kanchoku
             //
             deleteBackward(client: client)
             return true
@@ -813,6 +861,9 @@ class InputController: IMKInputController {
                 autoPreview()
                 return true
             }
+            // prefix kanchoku
+            if optPrefixKanchoku && !tt.isReset { tt.reset(); return true }
+            // /prefix kanchoku
             kanji = ""; kana = ""
             if isEmpty { return false }
             /*
@@ -879,7 +930,7 @@ class InputController: IMKInputController {
         if receive(string: string, client: client) {
             // if optAutoConvert, let event = returnKeyEvent { candidates?.interpretKeyEvents([event]) }
             commitComposition(client: client)
-            return false
+            return true
         }
         //
         showPreedit(client: client)
@@ -895,6 +946,27 @@ private extension InputController {
     // receive key input as string
     // @discardableResult
     func receive(string: String, client: IMKTextInput) -> Bool {
+        // prefix kanchoku
+        if optPrefixKanchoku {
+            if prefixed {
+                let s = tt.trans(char: string)
+                if s == string { tt.reset() }
+                roman += s
+                //
+                if optAutoConvert {
+                    var remainder = ""
+                    (kana, remainder) = romanToKana(roman)
+                    kana += remainder
+                    convert(client: client)
+                }
+                //
+                prefixed = false
+                return false
+            }
+            if !prefixed && string == prefix { prefixed = true; return false }
+            tt.reset()
+        }
+        // /prefix kanchoku
         let remainder = romanToKana(roman + string).1
         // 大文字・記号など
         // if !remainder.isEmpty && !startingCharset.contains(remainder.unicodeScalars.first!) { return true }
@@ -910,6 +982,14 @@ private extension InputController {
         //
         return false
     }
+
+    // prefix kanchoku
+    func kana(client: IMKTextInput) {
+        let (kana, remainder) = romanToKana(roman)
+        kanji = kana + remainder
+        self.kana = kanji // XXX: Compatible Bind でひらがなのヘルプを抑制
+    }
+    // /prefix kanchoku
 
     func hiragana(client: IMKTextInput) {
         let (kana, remainder) = romanToKana(roman)
@@ -949,7 +1029,10 @@ private extension InputController {
     func convert(client: IMKTextInput) {
         candidateSelectionChanged = false
         if optOfflineMode {
-            cand = kanaKanji.look(kana)
+            // maze
+            // cand = kanaKanji.look(kana)
+            cand = kanaKanji.lookMaze(kana)
+            // /maze
             /*
             if let katakana = kana.applyingTransform(.hiraganaToKatakana, reverse: false) { cand.insertUnique(katakana) }
             cand.insertUnique(kana)
@@ -1037,6 +1120,11 @@ private extension InputController {
      */
         if !s.isEmpty {
             client.insertText(s, replacementRange: replacementRange)
+            // prefix kanchoku
+            // let certain = kana
+            let certain = !kana.isEmpty ? kana : roman
+            if optPrefixKanchoku && s != certain { help = tt.help(forString: s, withCertain: certain) }
+            // /prefix kanchoku
             roman = ""
             kana = ""
             kanji = ""
@@ -1146,11 +1234,13 @@ extension InputController {
     // /MODETIPS
 
     // kana preview
-    func showPreview(_ client: IMKTextInput, string: String) {
+    // prefix kanchoku
+    func showPreview(_ client: IMKTextInput, string: String, fadeDelay: Double? = nil) {
         var cursorRect: NSRect = .init()
         let _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &cursorRect)
-        HelperController.shared.showHelper(cursorRect: cursorRect, string: string)
+        HelperController.shared.showHelper(cursorRect: cursorRect, string: string, fadeDelay: fadeDelay)
     }
+    // /prefix kanchoku
 
     func hidePreview() {
         HelperController.shared.hideHelper()
@@ -1160,8 +1250,12 @@ extension InputController {
         let (kana, remainder) = romanToKana(roman)
         if let client = currentClient, optKanaPreview {
             let preview: String = kana + remainder
-            if preview.isEmpty || candidatesMode { hidePreview() }
-            else { showPreview(client, string: preview) }
+            // prefix kanchoku
+            if candidatesMode { hidePreview() }
+            else if !preview.isEmpty { showPreview(client, string: preview) }
+            else if !help.isEmpty { showPreview(client, string: help, fadeDelay: 5.0) }
+            else { hidePreview() }
+            // /prefix kanchoku
         } else { hidePreview() }
     }
 }

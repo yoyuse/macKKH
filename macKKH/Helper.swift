@@ -29,7 +29,7 @@ class HelperController: NSObject {
         helperTimer = nil
     }
 
-    func showHelper(cursorRect: NSRect, string: String) {
+    func showHelper(cursorRect: NSRect, string: String, fadeDelay: Double? = nil) {
         helperPanel.imageView.image = nil
         helperPanel.imageView.alphaValue = 0
         //
@@ -42,7 +42,7 @@ class HelperController: NSObject {
         // helperPanel.hasShadow = false
         helperPanel.isOpaque = true
         //
-        showHelper(cursorRect: cursorRect)
+        showHelper(cursorRect: cursorRect, fadeDelay: fadeDelay)
     }
 
     func showHelper(cursorRect: NSRect, image: NSImage) {
