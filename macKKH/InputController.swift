@@ -294,6 +294,11 @@ class InputController: IMKInputController {
     var tt: TT
     var help: String = ""
     // /prefix kanchoku
+    // caps lock kanchoku
+    var optCapsLockKanchoku: Bool = false
+    var optKanchoku: Bool { get { return optPrefixKanchoku || optCapsLockKanchoku } }
+    var capsLockModified: Bool = false
+    // /caps lock kanchoku
 
     // MARK: - init
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
@@ -333,6 +338,9 @@ class InputController: IMKInputController {
         // prefix kanchoku
         UserDefaults.standard.register(defaults: ["optPrefixKanchoku": false])
         // /prefix kanchoku
+        // caps lock kanchoku
+        UserDefaults.standard.register(defaults: ["optCapsLockKanchoku": false])
+        // /caps lock kanchoku
         // UserDefaults.standard.register(defaults: ["optSetWindowLevel": false])
         optRGTs = UserDefaults.standard.bool(forKey: "optRGTs")
         optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
@@ -342,6 +350,9 @@ class InputController: IMKInputController {
         // prefix kanchoku
         optPrefixKanchoku = UserDefaults.standard.bool(forKey: "optPrefixKanchoku")
         // /prefix kanchoku
+        // caps lock kanchoku
+        optCapsLockKanchoku = UserDefaults.standard.bool(forKey: "optCapsLockKanchoku")
+        // /caps lock kanchoku
         // optSetWindowLevel = UserDefaults.standard.bool(forKey: "optSetWindowLevel")
         //
         /*
@@ -432,11 +443,18 @@ class InputController: IMKInputController {
         menuItem = NSMenuItem(title: "Single Candidate / Reconvert", action: #selector(toggleSegmented(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = optSegmented ? .on : .off
+        //
+        menu.addItem(.separator())
         // prefix kanchoku
         menuItem = NSMenuItem(title: "TT-code input (“\(prefix)” Prefix)", action: #selector(togglePrefixKanchoku(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
         menuItem.state = optPrefixKanchoku ? .on : .off
         // /prefix kanchoku
+        // caps lock kanchoku
+        menuItem = NSMenuItem(title: "TT-code input (CapsLock)", action: #selector(toggleCapsLockKanchoku(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        menuItem.state = optCapsLockKanchoku ? .on : .off
+        // /caps lock kanchoku
         /*
         // setWindowLevel:
         menuItem = NSMenuItem(title: "setWindowLevel:", action: #selector(toggleSetWindowLevel(_:)), keyEquivalent: "")
@@ -517,8 +535,26 @@ class InputController: IMKInputController {
         optPrefixKanchoku.toggle()
         tt.reset()
         UserDefaults.standard.set(optPrefixKanchoku, forKey: "optPrefixKanchoku")
+        // caps lock kanchoku
+        if optPrefixKanchoku {
+            optCapsLockKanchoku = false
+            UserDefaults.standard.set(optCapsLockKanchoku, forKey: "optCapsLockKanchoku")
+        }
+        // /caps lock kanchoku
     }
     // /prefix kanchoku
+
+    // caps lock kanchoku
+    @objc func toggleCapsLockKanchoku(_ sender: Any) {
+        optCapsLockKanchoku.toggle()
+        tt.reset()
+        UserDefaults.standard.set(optCapsLockKanchoku, forKey: "optCapsLockKanchoku")
+        if optCapsLockKanchoku {
+            optPrefixKanchoku = false
+            UserDefaults.standard.set(optPrefixKanchoku, forKey: "optPrefixKanchoku")
+        }
+    }
+    // /caps lock kanchoku
 
     /*
     // setWindowLevel:
@@ -579,7 +615,11 @@ class InputController: IMKInputController {
         }
         //
         guard let client = sender as? IMKTextInput else { return false }
-        guard let string = event.characters else { return false }
+        // caps lock kanchoku
+        // guard let string = event.characters else { return false }
+        capsLockModified = event.modifierFlags.contains(.capsLock)
+        guard let string = optCapsLockKanchoku && capsLockModified ? event.charactersIgnoringModifiers : event.characters else { return false }
+        // /caps lock kanchoku
         guard let kee = KeyEventExpression(event).stringValue else { return false }
         //
         let flags = event.modifierFlags
@@ -632,6 +672,13 @@ class InputController: IMKInputController {
             kanji = ""; kana = ""
             // 無変換確定
             if kee == "eisu" {
+                // XXX: 英数で「親指漢直確定」するテスト
+                // kanchoku commit
+                // caps lock kanchoku
+                // if optPrefixKanchoku { kana(client: client) }
+                if optKanchoku { kana(client: client) }
+                // /caps lock kanchoku
+                // /kanchoku commit
                 commitComposition(client: client)
                 candidates?.hide()
                 hidePreview()
@@ -693,7 +740,10 @@ class InputController: IMKInputController {
             // prefix kanchoku
             // hiragana
             // hiragana(client: client)
-            if optPrefixKanchoku { kana(client: client) }
+            // caps lock kanchoku
+            // if optPrefixKanchoku { kana(client: client) }
+            if optKanchoku { kana(client: client) }
+            // /caps lock kanchoku
             else { hiragana(client: client) }
             // /prefix kanchoku
             if !optCompatibleBind { commitComposition(client: client) }
@@ -765,7 +815,10 @@ class InputController: IMKInputController {
                 return true
             }
             // prefix kanchoku
-            if optPrefixKanchoku && !tt.isReset { tt.reset(); return true }
+            // caps lock kanchoku
+            // if optPrefixKanchoku && !tt.isReset { tt.reset(); return true }
+            if optKanchoku && !tt.isReset { tt.reset(); return true }
+            // /caps lock kanchoku
             // /prefix kanchoku
             //
             deleteBackward(client: client)
@@ -862,7 +915,10 @@ class InputController: IMKInputController {
                 return true
             }
             // prefix kanchoku
-            if optPrefixKanchoku && !tt.isReset { tt.reset(); return true }
+            // caps lock kanchoku
+            // if optPrefixKanchoku && !tt.isReset { tt.reset(); return true }
+            if optKanchoku && !tt.isReset { tt.reset(); return true }
+            // /caps lock kanchoku
             // /prefix kanchoku
             kanji = ""; kana = ""
             if isEmpty { return false }
@@ -946,6 +1002,8 @@ private extension InputController {
     // receive key input as string
     // @discardableResult
     func receive(string: String, client: IMKTextInput) -> Bool {
+        // caps lock kanchoku
+        /*
         // prefix kanchoku
         if optPrefixKanchoku {
             if prefixed {
@@ -967,7 +1025,26 @@ private extension InputController {
             tt.reset()
         }
         // /prefix kanchoku
-        let remainder = romanToKana(roman + string).1
+         */
+        if optPrefixKanchoku && prefixed || optCapsLockKanchoku && capsLockModified {
+            let s = tt.trans(char: string)
+            if s == string { tt.reset() }
+            roman += s
+            //
+            if optAutoConvert {
+                var remainder = ""
+                (kana, remainder) = romanToKana(roman)
+                kana += remainder
+                convert(client: client)
+            }
+            //
+            if optPrefixKanchoku { prefixed = false }
+            return false
+        }
+        if optPrefixKanchoku && !prefixed && string == prefix { prefixed = true; return false }
+        tt.reset()
+        // /caps lock kanchoku
+        // let remainder = romanToKana(roman + string).1
         // 大文字・記号など
         // if !remainder.isEmpty && !startingCharset.contains(remainder.unicodeScalars.first!) { return true }
         roman += string
@@ -1123,7 +1200,10 @@ private extension InputController {
             // prefix kanchoku
             // let certain = kana
             let certain = !kana.isEmpty ? kana : roman
-            if optPrefixKanchoku && s != certain { help = tt.help(forString: s, withCertain: certain) }
+            // caps lock kanchoku
+            // if optPrefixKanchoku && s != certain { help = tt.help(forString: s, withCertain: certain) }
+            if optKanchoku && s != certain { help = tt.help(forString: s, withCertain: certain) }
+            // /caps lock kanchoku
             // /prefix kanchoku
             roman = ""
             kana = ""
