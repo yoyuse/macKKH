@@ -317,7 +317,7 @@
 				CODE_SIGN_ENTITLEMENTS = macKKH/macKKH.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = macKKH/Info.plist;
 				INFOPLIST_KEY_LSBackgroundOnly = YES;
@@ -329,7 +329,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.41;
+				MARKETING_VERSION = 1.0.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmail.yoyuse.inputmethod.macKKH;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -345,7 +345,7 @@
 				CODE_SIGN_ENTITLEMENTS = macKKH/macKKH.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = macKKH/Info.plist;
 				INFOPLIST_KEY_LSBackgroundOnly = YES;
@@ -357,7 +357,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.41;
+				MARKETING_VERSION = 1.0.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmail.yoyuse.inputmethod.macKKH;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
