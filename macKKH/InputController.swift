@@ -38,9 +38,17 @@ struct SegmentTuple: Equatable, /* Comparable, */ Hashable {
     }
 }
 
+enum Rules {
+    case uskana
+    case rgts
+    case hideduki
+}
+
 @objc(InputController)
 class InputController: IMKInputController {
-    var dict: [String:String] { get { return optRGTs ? dictRGTs : dictUSKana } }
+    // var dict: [String:String] { get { return optRGTs ? dictRGTs : dictUSKana } }
+    // var dict: [String:String] { get { return optHideduki ? dictHideduki : optRGTs ? dictRGTs : dictUSKana } }
+    var dict: [String:String] {get { return optRules == .hideduki ? dictHideduki : optRules == .rgts ? dictRGTs : dictUSKana }}
     var dictUSKana: [String:String] = [
         "3":"あ",  "e":"い",  "4":"う",  "5":"え",  "6":"お",
         "t":"か",  "g":"き",  "h":"く",  "'":"け",  "b":"こ",
@@ -197,9 +205,41 @@ class InputController: IMKInputController {
         "q.":"…",
         "q/":"・",
     ]
+    // Hideduki
+    var dictHideduki: [String:String] = [
+        //  "~":"〜",
+         ".":"。",  ",":"、",  "/":"・",
+        // "d/":"・", "d;":"；", "d.":"…",  "d,":"‥", "k/":"／",
+        // "ddh":"←", "ddj":"↓", "ddk":"↑", "ddl":"→", "d-":"〜",
+         "[":"「",  "]":"」",
+        // "ld":"「", "lk":"」", "d[":"『", "d]":"』",
+        "kf":"あ",  "i":"い",  "j":"う", "kr":"え", "kw":"お",
+         "s":"か",  "w":"き",  "h":"く", "kc":"け",  "x":"こ",
+         "b":"さ",  "e":"し",  "a":"す", "di":"せ",  "q":"そ",
+         "g":"た",  "z":"ち", "dm":"つ",  "r":"て",  "f":"と",
+         "v":"な",  "c":"に", "dp":"ぬ", "ka":"ね",  "n":"の",
+         "t":"は", "dn":"ひ", "du":"ふ", "dy":"へ", "kv":"ほ",
+        "dj":"ま", "ke":"み", "kb":"む", "kt":"め", "dk":"も",
+        "dh":"や", "do":"ゆ", "dl":"よ",
+        "kd":"ら",  "m":"り",  "o":"る", "ks":"れ", "kx":"ろ",
+        "kg":"わ", "kq":"ゐ", "kz":"ゑ",  "y":"を",  "u":"ん",
+         "p":"ー",
+        "df":"ぁ", "ki":"ぃ", "kj":"ぅ", "dr":"ぇ", "dw":"ぉ",
+        "km":"っ", "kh":"ゃ", "ko":"ゅ", "kl":"ょ",
+        "dg":"ゎ", "ds":"ヵ", "dc":"ヶ", "lj":"ヴ", // "lj":"ゔ",
+        "ls":"が", "lw":"ぎ", "lh":"ぐ", "lc":"げ", "lx":"ご",
+        "lb":"ざ", "le":"じ", "la":"ず", "li":"ぜ", "lq":"ぞ",
+        "lg":"だ", "lz":"ぢ", "lm":"づ", "lr":"で", "lf":"ど",
+        "lt":"ば", "ln":"び", "lu":"ぶ", "ly":"べ", "lv":"ぼ",
+        "dt":"ぱ", "kn":"ぴ", "ku":"ぷ", "ky":"ぺ", "dv":"ぽ",
+        // "lo":"゛", "de":"゜",
+    ]
     var romanPatternUSKana: NSRegularExpression?
     var romanPatternRGTs: NSRegularExpression?
-    var romanPattern: NSRegularExpression? { get { optRGTs ? romanPatternRGTs : romanPatternUSKana } }
+    var romanPatternHideduki: NSRegularExpression?
+    // var romanPattern: NSRegularExpression? { get { optRGTs ? romanPatternRGTs : romanPatternUSKana } }
+    // var romanPattern: NSRegularExpression? { get { optHideduki ? romanPatternHideduki : optRGTs ? romanPatternRGTs : romanPatternUSKana } }
+    var romanPattern: NSRegularExpression? { get { optRules == .hideduki ? romanPatternHideduki : optRules == .rgts ? romanPatternRGTs : romanPatternUSKana } }
     var printable: CharacterSet
     var charset: CharacterSet { get { return CharacterSet(charactersIn: dict.map { $0.key } .joined()) } } // XXX
     // var startingCharset: CharacterSet
@@ -226,7 +266,9 @@ class InputController: IMKInputController {
     // conversion history
     var hist: [SegmentTuple] = []
     // options
-    var optRGTs: Bool = false
+    // var optRGTs: Bool = false
+    // var optHideduki: Bool = false
+    var optRules: Rules = .uskana
     var optCompatibleBind: Bool = false
     var optKanaPreview: Bool = false { didSet { autoPreview() } }
     var optOfflineMode: Bool = false
@@ -295,9 +337,12 @@ class InputController: IMKInputController {
         // romanPattern = makeRomanPattern(rules: dict)
         romanPatternUSKana = makeRomanPattern(rules: dictUSKana)
         romanPatternRGTs = makeRomanPattern(rules: dictRGTs)
+        romanPatternHideduki = makeRomanPattern(rules: dictHideduki)
         //
         // options
-        UserDefaults.standard.register(defaults: ["optRGTs": false])
+        // UserDefaults.standard.register(defaults: ["optRGTs": false])
+        // UserDefaults.standard.register(defaults: ["optHideduki": false])
+        UserDefaults.standard.register(defaults: ["optRules": "uskana"])
         UserDefaults.standard.register(defaults: ["optCompatibleBind": false])
         UserDefaults.standard.register(defaults: ["optKanaPreview": false])
         UserDefaults.standard.register(defaults: ["optOfflineMode": false])
@@ -309,7 +354,11 @@ class InputController: IMKInputController {
         UserDefaults.standard.register(defaults: ["optCapsLockKanchoku": false])
         // /caps lock kanchoku
         // UserDefaults.standard.register(defaults: ["optSetWindowLevel": false])
-        optRGTs = UserDefaults.standard.bool(forKey: "optRGTs")
+        // optRGTs = UserDefaults.standard.bool(forKey: "optRGTs")
+        // optHideduki = UserDefaults.standard.bool(forKey: "optHideduki")
+        if let strRules = UserDefaults.standard.string(forKey: "optRules") {
+            optRules = strRules == "hideduki" ? .hideduki : strRules == "rgts" ? .rgts : .uskana
+        }
         optCompatibleBind = UserDefaults.standard.bool(forKey: "optCompatibleBind")
         optKanaPreview = UserDefaults.standard.bool(forKey: "optKanaPreview")
         optOfflineMode = UserDefaults.standard.bool(forKey: "optOfflineMode")
@@ -390,10 +439,25 @@ class InputController: IMKInputController {
         menuItem.state = eisuMode ? .on : .off
         //
         menu.addItem(.separator())
-        // rgts
-        menuItem = NSMenuItem(title: "RGTs", action: #selector(toggleRGTs(_:)), keyEquivalent: "")
+        // uskana
+        menuItem = NSMenuItem(title: "USKana", action: #selector(switchUSKana(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
-        menuItem.state = optRGTs ? .on : .off
+        menuItem.state = optRules == .uskana ? .on : .off
+        // rgts
+        // menuItem = NSMenuItem(title: "RGTs", action: #selector(toggleRGTs(_:)), keyEquivalent: "")
+        menuItem = NSMenuItem(title: "RGTs", action: #selector(switchRGTs(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        // menuItem.state = optRGTs ? .on : .off
+        // menuItem.state = optHideduki ? .off : optRGTs ? .on : .off
+        menuItem.state = optRules == .rgts ? .on : .off
+        // hideduki
+        // menuItem = NSMenuItem(title: "Hideduki", action: #selector(toggleHideduki(_:)), keyEquivalent: "")
+        menuItem = NSMenuItem(title: "Hideduki", action: #selector(switchHideduki(_:)), keyEquivalent: "")
+        menu.addItem(menuItem)
+        // menuItem.state = optHideduki ? .on : .off
+        menuItem.state = optRules == .hideduki ? .on : .off
+        //
+        menu.addItem(.separator())
         // compatible bind
         menuItem = NSMenuItem(title: "Compatible Bind", action: #selector(toggleCompatibleBind(_:)), keyEquivalent: "")
         menu.addItem(menuItem)
@@ -467,10 +531,34 @@ class InputController: IMKInputController {
         eisuMode.toggle()
     }
 
+    // uskana
+    @objc func switchUSKana(_ sender: Any) {
+        optRules = .uskana
+        UserDefaults.standard.set("uskana", forKey: "optRules")
+    }
+
     // rgts
+    /*
     @objc func toggleRGTs(_ sender: Any) {
         optRGTs.toggle()
         UserDefaults.standard.set(optRGTs, forKey: "optRGTs")
+    }
+     */
+    @objc func switchRGTs(_ sender: Any) {
+        optRules = .rgts
+        UserDefaults.standard.set("rgts", forKey: "optRules")
+    }
+
+    // hideduki
+    /*
+    @objc func toggleHideduki(_ sender: Any) {
+        optHideduki.toggle()
+        UserDefaults.standard.set(optHideduki, forKey: "optHideduki")
+    }
+     */
+    @objc func switchHideduki(_ sender: Any) {
+        optRules = .hideduki
+        UserDefaults.standard.set("hideduki", forKey: "optRules")
     }
 
     // compatible bind
